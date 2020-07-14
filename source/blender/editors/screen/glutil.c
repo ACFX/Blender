@@ -147,6 +147,7 @@ void immDrawPixelsTexScaled_clipping(IMMDrawPixelsTexState *state,
   glPixelStorei(GL_UNPACK_ROW_LENGTH, img_w);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texid);
+  glBindSampler(0, 0);
 
   /* don't want nasty border artifacts */
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -494,16 +495,15 @@ float bglPolygonOffsetCalc(const float winmat[16], float viewdist, float dist)
     UNUSED_VARS(viewdist);
 #endif
   }
-  else {
-    /* This adjustment effectively results in reducing the Z value by 0.25%.
-     *
-     * winmat[14] actually evaluates to `-2 * far * near / (far - near)`,
-     * is very close to -0.2 with default clip range,
-     * and is used as the coefficient multiplied by `w / z`,
-     * thus controlling the z dependent part of the depth value.
-     */
-    return winmat[14] * -0.0025f * dist;
-  }
+
+  /* This adjustment effectively results in reducing the Z value by 0.25%.
+   *
+   * winmat[14] actually evaluates to `-2 * far * near / (far - near)`,
+   * is very close to -0.2 with default clip range,
+   * and is used as the coefficient multiplied by `w / z`,
+   * thus controlling the z dependent part of the depth value.
+   */
+  return winmat[14] * -0.0025f * dist;
 }
 
 /**
@@ -751,9 +751,7 @@ int ED_draw_imbuf_method(ImBuf *ibuf)
 
     return (size > threshold) ? IMAGE_DRAW_METHOD_2DTEXTURE : IMAGE_DRAW_METHOD_GLSL;
   }
-  else {
-    return U.image_draw_method;
-  }
+  return U.image_draw_method;
 }
 
 /* don't move to GPU_immediate_util.h because this uses user-prefs

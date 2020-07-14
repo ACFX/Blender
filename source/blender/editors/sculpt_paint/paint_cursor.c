@@ -557,11 +557,9 @@ static int project_brush_radius(ViewContext *vc, float radius, const float locat
     /* The distance between these points is the size of the projected brush in pixels. */
     return len_v2v2(p1, p2);
   }
-  else {
-    /* Assert because the code that sets up the vectors should disallow this. */
-    BLI_assert(0);
-    return 0;
-  }
+  /* Assert because the code that sets up the vectors should disallow this. */
+  BLI_assert(0);
+  return 0;
 }
 
 static bool sculpt_get_brush_geometry(bContext *C,
@@ -877,8 +875,12 @@ static bool paint_draw_alpha_overlay(UnifiedPaintSettings *ups,
   return alpha_overlay_active;
 }
 
-BLI_INLINE void draw_tri_point(
-    uint pos, const float sel_col[4], float pivot_col[4], float *co, float width, bool selected)
+BLI_INLINE void draw_tri_point(uint pos,
+                               const float sel_col[4],
+                               const float pivot_col[4],
+                               float *co,
+                               float width,
+                               bool selected)
 {
   immUniformColor4fv(selected ? sel_col : pivot_col);
 
@@ -907,8 +909,12 @@ BLI_INLINE void draw_tri_point(
   immEnd();
 }
 
-BLI_INLINE void draw_rect_point(
-    uint pos, const float sel_col[4], float handle_col[4], float *co, float width, bool selected)
+BLI_INLINE void draw_rect_point(uint pos,
+                                const float sel_col[4],
+                                const float handle_col[4],
+                                const float *co,
+                                float width,
+                                bool selected)
 {
   immUniformColor4fv(selected ? sel_col : handle_col);
 
@@ -1441,7 +1447,7 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
              * cursor won't be tagged to update, so always initialize the preview chain if it is
              * null before drawing it. */
             if (update_previews || !ss->pose_ik_chain_preview) {
-              BKE_sculpt_update_object_for_edit(depsgraph, vc.obact, true, false);
+              BKE_sculpt_update_object_for_edit(depsgraph, vc.obact, true, false, false);
 
               /* Free the previous pose brush preview. */
               if (ss->pose_ik_chain_preview) {
@@ -1567,7 +1573,8 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
         }
       }
       else {
-        if (vc.obact->sculpt->cache && !vc.obact->sculpt->cache->first_time) {
+        if (vc.obact->sculpt->cache &&
+            !SCULPT_stroke_is_first_brush_step_of_symmetry_pass(vc.obact->sculpt->cache)) {
           wmViewport(&region->winrct);
 
           /* Draw cached dynamic mesh preview lines. */
@@ -1593,7 +1600,8 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
           }
 
           if (brush->sculpt_tool == SCULPT_TOOL_MULTIPLANE_SCRAPE &&
-              brush->flag2 & BRUSH_MULTIPLANE_SCRAPE_PLANES_PREVIEW && !ss->cache->first_time) {
+              brush->flag2 & BRUSH_MULTIPLANE_SCRAPE_PLANES_PREVIEW &&
+              !SCULPT_stroke_is_first_brush_step_of_symmetry_pass(ss->cache)) {
             GPU_matrix_push_projection();
             ED_view3d_draw_setup_view(wm,
                                       CTX_wm_window(C),
@@ -1611,7 +1619,8 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
             GPU_matrix_pop_projection();
           }
 
-          if (brush->sculpt_tool == SCULPT_TOOL_CLOTH && !ss->cache->first_time) {
+          if (brush->sculpt_tool == SCULPT_TOOL_CLOTH &&
+              !SCULPT_stroke_is_first_brush_step_of_symmetry_pass(ss->cache)) {
             GPU_matrix_push_projection();
             ED_view3d_draw_setup_view(CTX_wm_manager(C),
                                       CTX_wm_window(C),
