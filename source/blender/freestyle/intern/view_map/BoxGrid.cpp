@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -24,7 +12,9 @@
 
 #include "BoxGrid.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 using namespace std;
 
@@ -37,14 +27,6 @@ namespace Freestyle {
 
 // Cell
 /////////
-
-BoxGrid::Cell::Cell()
-{
-}
-
-BoxGrid::Cell::~Cell()
-{
-}
 
 void BoxGrid::Cell::setDimensions(real x, real y, real sizeX, real sizeY)
 {
@@ -87,10 +69,6 @@ BoxGrid::Iterator::Iterator(BoxGrid &grid, Vec3r &center, real /*epsilon*/)
   _current = _cell->faces.begin();
 }
 
-BoxGrid::Iterator::~Iterator()
-{
-}
-
 // BoxGrid
 /////////////////
 
@@ -124,9 +102,7 @@ BoxGrid::BoxGrid(OccluderSource &source,
   }
 }
 
-BoxGrid::~BoxGrid()
-{
-}
+BoxGrid::~BoxGrid() = default;
 
 void BoxGrid::assignCells(OccluderSource & /*source*/,
                           GridDensityProvider &density,
@@ -146,18 +122,18 @@ void BoxGrid::assignCells(OccluderSource & /*source*/,
   // Now allocate the cell table and fill it with default (empty) cells
   _cells.resize(_cellsX * _cellsY);
   for (cellContainer::iterator i = _cells.begin(), end = _cells.end(); i != end; ++i) {
-    (*i) = NULL;
+    (*i) = nullptr;
   }
 
   // Identify cells that will be used, and set the dimensions for each
   ViewMap::fedges_container &fedges = viewMap->FEdges();
-  for (ViewMap::fedges_container::iterator f = fedges.begin(), fend = fedges.end(); f != fend;
-       ++f) {
+  for (ViewMap::fedges_container::iterator f = fedges.begin(), fend = fedges.end(); f != fend; ++f)
+  {
     if ((*f)->isInImage()) {
       Vec3r point = transform((*f)->center3d());
-      unsigned int i, j;
+      uint i, j;
       getCellCoordinates(point, i, j);
-      if (_cells[i * _cellsY + j] == NULL) {
+      if (_cells[i * _cellsY + j] == nullptr) {
         // This is an uninitialized cell
         real x, y, width, height;
 
@@ -177,11 +153,11 @@ void BoxGrid::assignCells(OccluderSource & /*source*/,
 
 void BoxGrid::distributePolygons(OccluderSource &source)
 {
-  unsigned long nFaces = 0;
-  unsigned long nKeptFaces = 0;
+  ulong nFaces = 0;
+  ulong nKeptFaces = 0;
 
   for (source.begin(); source.isValid(); source.next()) {
-    OccluderData *occluder = NULL;
+    OccluderData *occluder = nullptr;
 
     try {
       if (insertOccluder(source, occluder)) {
@@ -193,14 +169,14 @@ void BoxGrid::distributePolygons(OccluderSource &source)
       // If an exception was thrown, _faces.push_back() cannot have succeeded.
       // occluder is not owned by anyone, and must be deleted.
       // If the exception was thrown before or during new OccluderData(), then
-      // occluder is NULL, and this delete is harmless.
+      // occluder is nullptr, and this delete is harmless.
       delete occluder;
       throw;
     }
     ++nFaces;
   }
   if (G.debug & G_DEBUG_FREESTYLE) {
-    cout << "Distributed " << nFaces << " occluders.  Retained " << nKeptFaces << "." << endl;
+    cout << "Distributed " << nFaces << " occluders. Retained " << nKeptFaces << "." << endl;
   }
 }
 
@@ -208,21 +184,21 @@ void BoxGrid::reorganizeCells()
 {
   // Sort the occluders by shallowest point
   for (vector<Cell *>::iterator i = _cells.begin(), end = _cells.end(); i != end; ++i) {
-    if (*i != NULL) {
+    if (*i != nullptr) {
       (*i)->indexPolygons();
     }
   }
 }
 
-void BoxGrid::getCellCoordinates(const Vec3r &point, unsigned &x, unsigned &y)
+void BoxGrid::getCellCoordinates(const Vec3r &point, uint &x, uint &y)
 {
-  x = min(_cellsX - 1, (unsigned)floor(max((double)0.0f, point[0] - _cellOrigin[0]) / _cellSize));
-  y = min(_cellsY - 1, (unsigned)floor(max((double)0.0f, point[1] - _cellOrigin[1]) / _cellSize));
+  x = min(_cellsX - 1, uint(floor(max(double(0.0f), point[0] - _cellOrigin[0]) / _cellSize)));
+  y = min(_cellsY - 1, uint(floor(max(double(0.0f), point[1] - _cellOrigin[1]) / _cellSize)));
 }
 
 BoxGrid::Cell *BoxGrid::findCell(const Vec3r &point)
 {
-  unsigned int x, y;
+  uint x, y;
   getCellCoordinates(point, x, y);
   return _cells[x * _cellsY + y];
 }
@@ -240,10 +216,6 @@ const Vec3r &BoxGrid::viewpoint() const
 bool BoxGrid::enableQI() const
 {
   return _enableQI;
-}
-
-BoxGrid::Transform::Transform() : GridHelpers::Transform()
-{
 }
 
 Vec3r BoxGrid::Transform::operator()(const Vec3r &point) const

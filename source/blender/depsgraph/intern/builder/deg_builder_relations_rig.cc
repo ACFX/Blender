@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -25,9 +10,9 @@
 
 #include "intern/builder/deg_builder_relations.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring> /* required for STREQ later on. */
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -41,25 +26,28 @@
 #include "DNA_customdata_types.h"
 #include "DNA_object_types.h"
 
-#include "BKE_action.h"
-#include "BKE_armature.h"
+#include "BKE_action.hh"
+#include "BKE_armature.hh"
 #include "BKE_constraint.h"
+#include "BKE_lib_query.hh"
 
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
+#include "RNA_prototypes.hh"
+
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_build.hh"
 
 #include "intern/builder/deg_builder.h"
+#include "intern/builder/deg_builder_cache.h"
 #include "intern/builder/deg_builder_pchanmap.h"
 #include "intern/debug/deg_debug.h"
-#include "intern/node/deg_node.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_operation.hh"
 
-#include "intern/depsgraph_relation.h"
-#include "intern/depsgraph_type.h"
+#include "intern/depsgraph_relation.hh"
+#include "intern/depsgraph_type.hh"
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 /* IK Solver Eval Steps */
 void DepsgraphRelationBuilder::build_ik_pose(Object *object,
@@ -85,14 +73,20 @@ void DepsgraphRelationBuilder::build_ik_pose(Object *object,
   OperationKey solver_key(
       &object->id, NodeType::EVAL_POSE, rootchan->name, OperationCode::POSE_IK_SOLVER);
   OperationKey pose_cleanup_key(&object->id, NodeType::EVAL_POSE, OperationCode::POSE_CLEANUP);
-  add_relation(pchan_local_key, init_ik_key, "IK Constraint -> Init IK Tree");
+  /* If any of the constraint parameters are animated, connect the relation. Since there is only
+   * one Init IK node per armature, this link has quite high risk of spurious dependency cycles.
+   */
+  const bool is_itasc = (object->pose->iksolver == IKSOLVER_ITASC);
+  PointerRNA con_ptr = RNA_pointer_create(&object->id, &RNA_Constraint, con);
+  if (is_itasc || cache_->isAnyPropertyAnimated(&con_ptr)) {
+    add_relation(pchan_local_key, init_ik_key, "IK Constraint -> Init IK Tree");
+  }
   add_relation(init_ik_key, solver_key, "Init IK -> IK Solver");
   /* Never cleanup before solver is run. */
   add_relation(solver_key, pose_cleanup_key, "IK Solver -> Cleanup", RELATION_FLAG_GODMODE);
   /* The ITASC solver currently accesses the target transforms in init tree :(
    * TODO: Fix ITASC and remove this.
    */
-  bool is_itasc = (object->pose->iksolver == IKSOLVER_ITASC);
   OperationKey target_dependent_key = is_itasc ? init_ik_key : solver_key;
   /* IK target */
   /* TODO(sergey): This should get handled as part of the constraint code. */
@@ -101,6 +95,12 @@ void DepsgraphRelationBuilder::build_ik_pose(Object *object,
     if (data->tar != object) {
       ComponentKey target_key(&data->tar->id, NodeType::TRANSFORM);
       add_relation(target_key, target_dependent_key, con->name);
+      /* Ensure target evaluated copy is ready by the time IK tree is built just in case. */
+      ComponentKey target_cow_key(&data->tar->id, NodeType::COPY_ON_EVAL);
+      add_relation(target_cow_key,
+                   init_ik_key,
+                   "IK Target Copy-on-Eval -> Init IK Tree",
+                   RELATION_CHECK_BEFORE_ADD);
     }
     /* Subtarget references: */
     if ((data->tar->type == OB_ARMATURE) && (data->subtarget[0])) {
@@ -130,6 +130,12 @@ void DepsgraphRelationBuilder::build_ik_pose(Object *object,
     if (data->poletar != object) {
       ComponentKey target_key(&data->poletar->id, NodeType::TRANSFORM);
       add_relation(target_key, target_dependent_key, con->name);
+      /* Ensure target evaluated copy is ready by the time IK tree is built just in case. */
+      ComponentKey target_cow_key(&data->poletar->id, NodeType::COPY_ON_EVAL);
+      add_relation(target_cow_key,
+                   init_ik_key,
+                   "IK Target Copy-on-Eval -> Init IK Tree",
+                   RELATION_CHECK_BEFORE_ADD);
     }
     /* Subtarget references: */
     if ((data->poletar->type == OB_ARMATURE) && (data->polesubtarget[0])) {
@@ -238,7 +244,8 @@ void DepsgraphRelationBuilder::build_splineik_pose(Object *object,
   /* Walk to the chain's root/ */
   int segcount = 1;
   for (bPoseChannel *parchan = pchan->parent; parchan != nullptr && segcount < data->chainlen;
-       parchan = parchan->parent, segcount++) {
+       parchan = parchan->parent, segcount++)
+  {
     /* Make Spline IK solver dependent on this bone's result, since it can
      * only run after the standard results of the bone are know. Validate
      * links step on the bone will ensure that users of this bone only grab
@@ -287,7 +294,7 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
 {
   /* Armature-Data */
   bArmature *armature = (bArmature *)object->data;
-  // TODO: selection status?
+  /* TODO: selection status? */
   /* Attach links between pose operations. */
   ComponentKey local_transform(&object->id, NodeType::TRANSFORM);
   OperationKey pose_init_key(&object->id, NodeType::EVAL_POSE, OperationCode::POSE_INIT);
@@ -302,7 +309,12 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
   OperationKey armature_key(&armature->id, NodeType::ARMATURE, OperationCode::ARMATURE_EVAL);
   add_relation(armature_key, pose_init_key, "Data dependency");
   /* Run cleanup even when there are no bones. */
-  add_relation(pose_init_key, pose_cleanup_key, "Init -> Cleanup");
+  add_relation(pose_init_ik_key, pose_cleanup_key, "Init -> Cleanup");
+  /* Relation to the instance, so that instancer can use pose of this object. */
+  add_relation(ComponentKey(&object->id, NodeType::EVAL_POSE),
+               OperationKey{&object->id, NodeType::INSTANCING, OperationCode::INSTANCE},
+               "Transform -> Instance");
+
   /* IK Solvers.
    *
    * - These require separate processing steps are pose-level to be executed
@@ -321,7 +333,11 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
   RootPChanMap root_map;
   bool pose_depends_on_local_transform = false;
   LISTBASE_FOREACH (bPoseChannel *, pchan, &object->pose->chanbase) {
+    const BuilderStack::ScopedEntry stack_entry = stack_.trace(*pchan);
+
     LISTBASE_FOREACH (bConstraint *, con, &pchan->constraints) {
+      const BuilderStack::ScopedEntry stack_entry = stack_.trace(*con);
+
       switch (con->type) {
         case CONSTRAINT_TYPE_KINEMATIC:
           build_ik_pose(object, pchan, con, &root_map);
@@ -348,13 +364,15 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
   // root_map.print_debug();
   if (pose_depends_on_local_transform) {
     /* TODO(sergey): Once partial updates are possible use relation between
-     * object transform and solver itself in it's build function. */
+     * object transform and solver itself in its build function. */
     ComponentKey pose_key(&object->id, NodeType::EVAL_POSE);
     ComponentKey local_transform_key(&object->id, NodeType::TRANSFORM);
     add_relation(local_transform_key, pose_key, "Local Transforms");
   }
   /* Links between operations for each bone. */
   LISTBASE_FOREACH (bPoseChannel *, pchan, &object->pose->chanbase) {
+    const BuilderStack::ScopedEntry stack_entry = stack_.trace(*pchan);
+
     build_idproperties(pchan->prop);
     OperationKey bone_local_key(
         &object->id, NodeType::BONE, pchan->name, OperationCode::BONE_LOCAL);
@@ -388,7 +406,7 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
       /* Build relations for indirectly linked objects. */
       BuilderWalkUserData data;
       data.builder = this;
-      BKE_constraints_id_loop(&pchan->constraints, constraint_walk, &data);
+      BKE_constraints_id_loop(&pchan->constraints, constraint_walk, IDWALK_NOP, &data);
       /* Constraints stack and constraint dependencies. */
       build_constraints(&object->id, NodeType::BONE, pchan->name, &pchan->constraints, &root_map);
       /* Pose -> constraints. */
@@ -398,7 +416,7 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
       add_relation(bone_local_key, constraints_key, "Local -> Constraints Stack");
       /* Constraints -> ready/ */
       /* TODO(sergey): When constraint stack is exploded, this step should
-       * occur before the first IK solver.  */
+       * occur before the first IK solver. */
       add_relation(constraints_key, bone_ready_key, "Constraints -> Ready");
     }
     else {
@@ -422,8 +440,9 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
       if (prev) {
         OperationCode opcode = OperationCode::BONE_DONE;
         /* Inheriting parent roll requires access to prev handle's B-Bone properties. */
-        if ((pchan->bone->flag & BONE_ADD_PARENT_END_ROLL) != 0 &&
-            check_pchan_has_bbone_segments(object, prev)) {
+        if ((pchan->bone->bbone_flag & BBONE_ADD_PARENT_END_ROLL) != 0 &&
+            check_pchan_has_bbone_segments(object, prev))
+        {
           opcode = OperationCode::BONE_SEGMENTS;
         }
         OperationKey prev_key(&object->id, NodeType::BONE, prev->name, opcode);
@@ -451,64 +470,9 @@ void DepsgraphRelationBuilder::build_rig(Object *object)
     /* Custom shape. */
     if (pchan->custom != nullptr) {
       build_object(pchan->custom);
+      add_visibility_relation(&pchan->custom->id, &armature->id);
     }
   }
 }
 
-void DepsgraphRelationBuilder::build_proxy_rig(Object *object)
-{
-  bArmature *armature = (bArmature *)object->data;
-  Object *proxy_from = object->proxy_from;
-  build_armature(armature);
-  OperationKey pose_init_key(&object->id, NodeType::EVAL_POSE, OperationCode::POSE_INIT);
-  OperationKey pose_done_key(&object->id, NodeType::EVAL_POSE, OperationCode::POSE_DONE);
-  OperationKey pose_cleanup_key(&object->id, NodeType::EVAL_POSE, OperationCode::POSE_CLEANUP);
-  LISTBASE_FOREACH (bPoseChannel *, pchan, &object->pose->chanbase) {
-    build_idproperties(pchan->prop);
-    OperationKey bone_local_key(
-        &object->id, NodeType::BONE, pchan->name, OperationCode::BONE_LOCAL);
-    OperationKey bone_ready_key(
-        &object->id, NodeType::BONE, pchan->name, OperationCode::BONE_READY);
-    OperationKey bone_done_key(&object->id, NodeType::BONE, pchan->name, OperationCode::BONE_DONE);
-    OperationKey from_bone_done_key(
-        &proxy_from->id, NodeType::BONE, pchan->name, OperationCode::BONE_DONE);
-    add_relation(pose_init_key, bone_local_key, "Pose Init -> Bone Local");
-    add_relation(bone_local_key, bone_ready_key, "Local -> Ready");
-    add_relation(bone_ready_key, bone_done_key, "Ready -> Done");
-    add_relation(bone_done_key, pose_cleanup_key, "Bone Done -> Pose Cleanup");
-    add_relation(bone_done_key, pose_done_key, "Bone Done -> Pose Done", RELATION_FLAG_GODMODE);
-    /* Make sure bone in the proxy is not done before it's FROM is done. */
-    if (check_pchan_has_bbone(object, pchan)) {
-      OperationKey from_bone_segments_key(
-          &proxy_from->id, NodeType::BONE, pchan->name, OperationCode::BONE_SEGMENTS);
-      add_relation(from_bone_segments_key,
-                   bone_done_key,
-                   "Bone Segments -> Bone Done",
-                   RELATION_FLAG_GODMODE);
-    }
-    else {
-      add_relation(from_bone_done_key, bone_done_key, "Bone Done -> Bone Done");
-    }
-
-    /* Parent relation: even though the proxy bone itself doesn't need
-     * the parent bone, some users expect the parent to be ready if the
-     * bone itself is (e.g. for computing the local space matrix).
-     */
-    if (pchan->parent != nullptr) {
-      OperationKey parent_key(
-          &object->id, NodeType::BONE, pchan->parent->name, OperationCode::BONE_DONE);
-      add_relation(parent_key, bone_done_key, "Parent Bone -> Child Bone");
-    }
-
-    if (pchan->prop != nullptr) {
-      OperationKey bone_parameters(
-          &object->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EVAL, pchan->name);
-      OperationKey from_bone_parameters(
-          &proxy_from->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EVAL, pchan->name);
-      add_relation(from_bone_parameters, bone_parameters, "Proxy Bone Parameters");
-    }
-  }
-}
-
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

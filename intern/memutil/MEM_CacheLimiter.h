@@ -1,21 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup memutil
+ * \ingroup intern_memutil
  */
 
 #ifndef __MEM_CACHELIMITER_H__
@@ -208,8 +196,9 @@ template<class T> class MEM_CacheLimiter {
     while (!queue.empty() && mem_in_use > max) {
       MEM_CacheElementPtr elem = get_least_priority_destroyable_element();
 
-      if (!elem)
+      if (!elem) {
         break;
+      }
 
       if (data_size_func) {
         cur_size = data_size_func(elem->get()->get_data());
@@ -267,24 +256,27 @@ template<class T> class MEM_CacheLimiter {
       return false;
     }
     if (item_destroyable_func) {
-      if (!item_destroyable_func(elem->get()->get_data()))
+      if (!item_destroyable_func(elem->get()->get_data())) {
         return false;
+      }
     }
     return true;
   }
 
   MEM_CacheElementPtr get_least_priority_destroyable_element(void)
   {
-    if (queue.empty())
+    if (queue.empty()) {
       return NULL;
+    }
 
     MEM_CacheElementPtr best_match_elem = NULL;
 
     if (!item_priority_func) {
       for (iterator it = queue.begin(); it != queue.end(); it++) {
         MEM_CacheElementPtr elem = *it;
-        if (!can_destroy_element(elem))
+        if (!can_destroy_element(elem)) {
           continue;
+        }
         best_match_elem = elem;
         break;
       }
@@ -296,12 +288,13 @@ template<class T> class MEM_CacheLimiter {
       for (i = 0; i < queue.size(); i++) {
         MEM_CacheElementPtr elem = queue[i];
 
-        if (!can_destroy_element(elem))
+        if (!can_destroy_element(elem)) {
           continue;
+        }
 
-        /* by default 0 means highest priority element */
-        /* casting a size type to int is questionable,
-           but unlikely to cause problems */
+        /* By default 0 means highest priority element. */
+        /* Casting a size type to int is questionable,
+         * but unlikely to cause problems. */
         int priority = -((int)(queue.size()) - i - 1);
         priority = item_priority_func(elem->get()->get_data(), priority);
 

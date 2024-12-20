@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -26,8 +11,7 @@
  *   All defines, etc. are only still maintained to provide backwards compatibility for old files.
  */
 
-#ifndef __DNA_IPO_TYPES_H__
-#define __DNA_IPO_TYPES_H__
+#pragma once
 
 #include "DNA_curve_types.h"
 #include "DNA_listBase.h"
@@ -60,25 +44,30 @@ typedef struct IpoDriver {
 typedef struct IpoCurve {
   struct IpoCurve *next, *prev;
 
-  /** Array of BPoints (sizeof(BPoint) * totvert) - i.e. baked/imported data. */
+  /** Array of #BPoints `(sizeof(BPoint) * totvert)` - i.e. baked/imported data. */
   struct BPoint *bp;
-  /** Array of BezTriples (sizeof(BezTriple) * totvert)  - i.e. user-editable keyframes . */
+  /** Array of #BezTriples `(sizeof(BezTriple) * totvert)` - i.e. user-editable keyframes. */
   struct BezTriple *bezt;
 
   /** Bounding boxes. */
   rctf maxrct, totrct;
 
-  /** Blocktype= ipo-blocktype; adrcode= type of ipo-curve; vartype= 'format' of data. */
-  short blocktype, adrcode, vartype;
+  /** Block-type of the curve (#ID_Type). */
+  short blocktype;
+  /** Type of ipo-curve. */
+  short adrcode;
+  /** Format of data. */
+  short vartype;
   /** Total number of BezTriples (i.e. keyframes) on curve. */
   short totvert;
-  /** Interpolation and extrapolation modes . */
+  /** Interpolation and extrapolation modes. */
   short ipo, extrap;
-  /** Flag= settings; rt= ???. */
-  short flag, rt;
+  /** Flag= settings. */
+  short flag;
+  char _pad0[2];
   /** Minimum/maximum y-extents for curve. */
   float ymin, ymax;
-  /** ???. */
+  /** Unused since the first available revision. */
   unsigned int bitmask;
 
   /** Minimum/maximum values for sliders (in action editor). */
@@ -98,13 +87,14 @@ typedef struct Ipo {
 
   /** A list of IpoCurve structs in a linked list. */
   ListBase curve;
-  /** Rect defining extents of keyframes?. */
+  /** Rect defining extents of keyframes? */
   rctf cur;
 
-  /** Blocktype: self-explanatory; showkey: either 0 or 1
-   * (show vertical yellow lines for editing). */
-  short blocktype, showkey;
-  /** Muteipo: either 0 or 1 (whether ipo block is muted). */
+  /** #ID_Type. */
+  short blocktype;
+  /** Either 0 or 1 (show vertical yellow lines for editing). */
+  short showkey;
+  /** Mute-IPO: either 0 or 1 (whether ipo block is muted). */
   short muteipo;
   char _pad[2];
 } Ipo;
@@ -284,7 +274,7 @@ typedef struct Ipo {
 #define SEQ_FAC_SPEED 2
 #define SEQ_FAC_OPACITY 3
 
-/* ********* Curve (ID_CU) *********** */
+/* ********* Curve (ID_CU_LEGACY) *********** */
 
 #define CU_TOTIPO 1
 #define CU_TOTNAM 1
@@ -318,12 +308,12 @@ typedef struct Ipo {
 #define WO_MISTSTA 10
 #define WO_MISTHI 11
 
-/* Stars are deprecated */
-#define WO_STAR_R 12
-#define WO_STAR_G 13
-#define WO_STAR_B 14
-#define WO_STARDIST 15
-#define WO_STARSIZE 16
+/* Stars are deprecated & unused. */
+// #define WO_STAR_R 12
+// #define WO_STAR_G 13
+// #define WO_STAR_B 14
+// #define WO_STARDIST 15
+// #define WO_STARSIZE 16
 
 /* ********** Light (ID_LA) ********** */
 
@@ -350,7 +340,7 @@ typedef struct Ipo {
 #define CAM_STA 2
 #define CAM_END 3
 
-/* yafray aperture & focal distance curves */
+/* YAFRAY aperture & focal distance curves. */
 #define CAM_YF_APERT 4
 #define CAM_YF_FDIST 5
 
@@ -428,10 +418,10 @@ typedef struct Ipo {
 #define PART_TOTNAM 25
 
 #define PART_EMIT_FREQ 1
-/* #define PART_EMIT_LIFE   2 */ /*UNUSED*/
+// #define PART_EMIT_LIFE 2 /* UNUSED */
 #define PART_EMIT_VEL 3
 #define PART_EMIT_AVE 4
-/* #define PART_EMIT_SIZE   5 */ /*UNUSED*/
+// #define PART_EMIT_SIZE 5 /* UNUSED */
 
 #define PART_AVE 6
 #define PART_SIZE 7
@@ -482,7 +472,7 @@ typedef struct Ipo {
 #define IPO_SHORT_BIT 17
 #define IPO_INT_BIT 18
 
-/* icu->ipo:  the type of curve */
+/* icu->ipo: the type of curve. */
 #define IPO_CONST 0
 #define IPO_LIN 1
 #define IPO_BEZ 2
@@ -507,7 +497,7 @@ typedef struct Ipo {
 
 /* ---------- IPO Drivers ----------- */
 
-/* offset in driver->name for finding second posechannel for rot-diff  */
+/* Offset in driver->name for finding second posechannel for rot-diff. */
 #define DRIVER_NAME_OFFS 32
 
 /* driver->type */
@@ -517,5 +507,3 @@ typedef struct Ipo {
 /* driver->flag */
 /* invalid flag: currently only used for buggy pydriver expressions */
 #define IPO_DRIVER_FLAG_INVALID (1 << 0)
-
-#endif

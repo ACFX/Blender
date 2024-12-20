@@ -1,42 +1,28 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_IMAGE_TYPES_H__
-#define __DNA_IMAGE_TYPES_H__
+#pragma once
 
 #include "DNA_ID.h"
 #include "DNA_color_types.h" /* for color management */
 #include "DNA_defs.h"
 
 struct GPUTexture;
+struct ImBufAnim;
 struct MovieCache;
 struct PackedFile;
 struct RenderResult;
 struct Scene;
-struct anim;
 
-/* ImageUser is in Texture, in Nodes, Background Image, Image Window, .... */
-/* should be used in conjunction with an ID * to Image. */
+/**
+ * ImageUser is in Texture, in Nodes, Background Image, Image Window, ...
+ * should be used in conjunction with an ID * to Image.
+ */
 typedef struct ImageUser {
   /** To retrieve render result. */
   struct Scene *scene;
@@ -48,16 +34,13 @@ typedef struct ImageUser {
   /** Offset within movie, start frame in global time. */
   int offset, sfra;
   /** Cyclic flag. */
-  char _pad0, cycl;
-  char ok;
+  char cycl;
 
   /** Multiview current eye - for internal use of drawing routines. */
   char multiview_eye;
   short pass;
-  char _pad1[2];
 
   int tile;
-  int _pad2;
 
   /** Listbase indices, for menu browsing or retrieve buffer. */
   short multi_index, view, layer;
@@ -66,7 +49,7 @@ typedef struct ImageUser {
 
 typedef struct ImageAnim {
   struct ImageAnim *next, *prev;
-  struct anim *anim;
+  struct ImBufAnim *anim;
 } ImageAnim;
 
 typedef struct ImageView {
@@ -80,6 +63,11 @@ typedef struct ImageView {
 typedef struct ImagePackedFile {
   struct ImagePackedFile *next, *prev;
   struct PackedFile *packedfile;
+
+  /* Which view and tile this ImagePackedFile represents. Normal images will use 0 and 1001
+   * respectively when creating their ImagePackedFile. Must be provided for each packed image. */
+  int view;
+  int tile_number;
   /** 1024 = FILE_MAX. */
   char filepath[1024];
 } ImagePackedFile;
@@ -103,38 +91,70 @@ typedef struct ImageTile {
 
   struct ImageTile_Runtime runtime;
 
-  char ok;
-  char _pad[3];
-
   int tile_number;
+
+  /* for generated images */
+  int gen_x, gen_y;
+  char gen_type, gen_flag;
+  short gen_depth;
+  float gen_color[4];
+
   char label[64];
 } ImageTile;
 
-/* iuser->flag */
-#define IMA_ANIM_ALWAYS (1 << 0)
-/* #define IMA_UNUSED_1         (1 << 1) */
-/* #define IMA_UNUSED_2         (1 << 2) */
-#define IMA_NEED_FRAME_RECALC (1 << 3)
-#define IMA_SHOW_STEREO (1 << 4)
-
+/** #ImageUser::flag */
 enum {
-  TEXTARGET_TEXTURE_2D = 0,
-  TEXTARGET_TEXTURE_CUBE_MAP = 1,
-  TEXTARGET_TEXTURE_2D_ARRAY = 2,
-  TEXTARGET_TEXTURE_TILE_MAPPING = 3,
-  TEXTARGET_COUNT = 4,
+  IMA_ANIM_ALWAYS = 1 << 0,
+  // IMA_UNUSED_1 = 1 << 1,
+  // IMA_UNUSED_2 = 1 << 2,
+  IMA_NEED_FRAME_RECALC = 1 << 3,
+  IMA_SHOW_STEREO = 1 << 4,
+  // IMA_UNUSED_5 = 1 << 5,
 };
+
+/* Used to get the correct gpu texture from an Image datablock. */
+typedef enum eGPUTextureTarget {
+  TEXTARGET_2D = 0,
+  TEXTARGET_2D_ARRAY,
+  TEXTARGET_TILE_MAPPING,
+  TEXTARGET_COUNT,
+} eGPUTextureTarget;
+
+/* Defined in BKE_image.hh. */
+struct PartialUpdateRegister;
+struct PartialUpdateUser;
+
+typedef struct Image_Runtime {
+  /* Mutex used to guarantee thread-safe access to the cached ImBuf of the corresponding image ID.
+   */
+  void *cache_mutex;
+
+  /** \brief Register containing partial updates. */
+  struct PartialUpdateRegister *partial_update_register;
+  /** \brief Partial update user for GPUTextures stored inside the Image. */
+  struct PartialUpdateUser *partial_update_user;
+
+  /* Compositor viewer might be translated, and that translation will be stored in this runtime
+   * vector by the compositor so that the editor draw code can draw the image translated. */
+  float backdrop_offset[2];
+} Image_Runtime;
 
 typedef struct Image {
   ID id;
+  struct AnimData *adt;
+  /**
+   * Engines draw data, must be immediately after AnimData. See IdDdtTemplate and
+   * DRW_drawdatalist_from_id to understand this requirement.
+   */
+  DrawDataList drawdata;
 
   /** File path, 1024 = FILE_MAX. */
   char filepath[1024];
 
   /** Not written in file. */
   struct MovieCache *cache;
-  /** Not written in file 4 = TEXTARGET_COUNT, 2 = stereo eyes. */
-  struct GPUTexture *gputexture[4][2];
+  /** Not written in file 3 = TEXTARGET_COUNT, 2 = stereo eyes. */
+  struct GPUTexture *gputexture[3][2];
 
   /* sources from: */
   ListBase anims;
@@ -148,9 +168,16 @@ typedef struct Image {
   int lastframe;
 
   /* GPU texture flag. */
-  short gpuflag;
-  char _pad2[2];
   int gpuframenr;
+  short gpuflag;
+  short gpu_pass;
+  short gpu_layer;
+  short gpu_view;
+
+  /* Number of iterations to perform when extracting mask for uv seam fixing. */
+  short seam_margin;
+
+  char _pad2[2];
 
   /** Deprecated. */
   struct PackedFile *packedfile DNA_DEPRECATED;
@@ -160,10 +187,10 @@ typedef struct Image {
   int lastused;
 
   /* for generated images */
-  int gen_x, gen_y;
-  char gen_type, gen_flag;
-  short gen_depth;
-  float gen_color[4];
+  int gen_x DNA_DEPRECATED, gen_y DNA_DEPRECATED;
+  char gen_type DNA_DEPRECATED, gen_flag DNA_DEPRECATED;
+  short gen_depth DNA_DEPRECATED;
+  float gen_color[4] DNA_DEPRECATED;
 
   /* display aspect - for UV editing images resized for faster openGL display */
   float aspx, aspy;
@@ -186,11 +213,13 @@ typedef struct Image {
   /** ImageView. */
   ListBase views;
   struct Stereo3dFormat *stereo3d_format;
+
+  Image_Runtime runtime;
 } Image;
 
 /* **************** IMAGE ********************* */
 
-/* Image.flag */
+/** #Image.flag */
 enum {
   IMA_HIGH_BITDEPTH = (1 << 0),
   IMA_FLAG_UNUSED_1 = (1 << 1), /* cleared */
@@ -213,16 +242,14 @@ enum {
   IMA_FLAG_UNUSED_16 = (1 << 16), /* cleared */
 };
 
-/* Image.gpuflag */
+/** #Image.gpuflag */
 enum {
-  /** GPU texture needs to be refreshed. */
-  IMA_GPU_REFRESH = (1 << 0),
   /** All mipmap levels in OpenGL texture set? */
-  IMA_GPU_MIPMAP_COMPLETE = (1 << 1),
+  IMA_GPU_MIPMAP_COMPLETE = (1 << 0),
 };
 
 /* Image.source, where the image comes from */
-enum {
+typedef enum eImageSource {
   /* IMA_SRC_CHECK = 0, */ /* UNUSED */
   IMA_SRC_FILE = 1,
   IMA_SRC_SEQUENCE = 2,
@@ -230,10 +257,10 @@ enum {
   IMA_SRC_GENERATED = 4,
   IMA_SRC_VIEWER = 5,
   IMA_SRC_TILED = 6,
-};
+} eImageSource;
 
 /* Image.type, how to handle or generate the image */
-enum {
+typedef enum eImageType {
   IMA_TYPE_IMAGE = 0,
   IMA_TYPE_MULTILAYER = 1,
   /* generated */
@@ -241,29 +268,28 @@ enum {
   /* viewers */
   IMA_TYPE_R_RESULT = 4,
   IMA_TYPE_COMPOSITE = 5,
-};
+} eImageType;
 
-/* Image.gen_type */
+/** #Image.gen_type */
 enum {
   IMA_GENTYPE_BLANK = 0,
   IMA_GENTYPE_GRID = 1,
   IMA_GENTYPE_GRID_COLOR = 2,
 };
 
-/* render */
-#define IMA_MAX_RENDER_TEXT (1 << 9)
+/** Size of allocated string #RenderResult::text. */
+#define IMA_MAX_RENDER_TEXT_SIZE 512
 
-/* Image.gen_flag */
+/** #Image.gen_flag */
 enum {
-  IMA_GEN_FLOAT = 1,
+  IMA_GEN_FLOAT = (1 << 0),
+  IMA_GEN_TILE = (1 << 1),
 };
 
-/* Image.alpha_mode */
+/** #Image.alpha_mode */
 enum {
   IMA_ALPHA_STRAIGHT = 0,
   IMA_ALPHA_PREMUL = 1,
   IMA_ALPHA_CHANNEL_PACKED = 2,
   IMA_ALPHA_IGNORE = 3,
 };
-
-#endif

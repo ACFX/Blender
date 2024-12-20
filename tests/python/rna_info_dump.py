@@ -1,25 +1,9 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2010-2022 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Used for generating API diffs between releases
-#  ./blender.bin --background -noaudio --python tests/python/rna_info_dump.py
+#  ./blender.bin --background --python tests/python/rna_info_dump.py
 
 import bpy
 
@@ -81,7 +65,10 @@ def api_dump(use_properties=True, use_functions=True):
 
             for prop in v.properties:
                 if prop.collection_type:
-                    funcs = [(prop.identifier + "." + func.identifier, func) for func in prop.collection_type.functions]
+                    funcs = [
+                        (prop.identifier + "." + func.identifier, func)
+                        for func in prop.collection_type.functions
+                    ]
                     for func_id, func in funcs:
                         data.append(func_to_str(struct_id_str, func_id, func))
         data.sort()
@@ -100,7 +87,10 @@ def api_dump(use_properties=True, use_functions=True):
 
             for prop in v.properties:
                 if prop.collection_type:
-                    props = [(prop.identifier + "." + prop_sub.identifier, prop_sub) for prop_sub in prop.collection_type.properties]
+                    props = [
+                        (prop.identifier + "." + prop_sub.identifier, prop_sub)
+                        for prop_sub in prop.collection_type.properties
+                    ]
                     for prop_sub_id, prop_sub in props:
                         data.append(prop_to_str(struct_id_str, prop_sub_id, prop_sub))
         data.sort()

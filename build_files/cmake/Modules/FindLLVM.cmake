@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2015 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find LLVM library
 # Find the native LLVM includes and library
 # This module defines
@@ -10,17 +14,6 @@
 # also defined, but not for general use are
 #  LLVM_LIBRARY, where to find the LLVM library.
 
-#=============================================================================
-# Copyright 2015 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
-
 if(LLVM_ROOT_DIR)
   if(DEFINED LLVM_VERSION)
     find_program(LLVM_CONFIG llvm-config-${LLVM_VERSION} HINTS ${LLVM_ROOT_DIR}/bin NO_CMAKE_PATH)
@@ -30,13 +23,17 @@ if(LLVM_ROOT_DIR)
   endif()
 else()
   if(DEFINED LLVM_VERSION)
-        message(running llvm-config-${LLVM_VERSION})
+    message(running llvm-config-${LLVM_VERSION})
     find_program(LLVM_CONFIG llvm-config-${LLVM_VERSION})
   endif()
   if(NOT LLVM_CONFIG)
     find_program(LLVM_CONFIG llvm-config)
   endif()
 endif()
+
+execute_process(COMMAND ${LLVM_CONFIG} --includedir
+      OUTPUT_VARIABLE LLVM_INCLUDE_DIRS
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 if(NOT DEFINED LLVM_VERSION)
   execute_process(COMMAND ${LLVM_CONFIG} --version
@@ -84,12 +81,12 @@ if(LLVM_LIBRARY AND LLVM_ROOT_DIR AND LLVM_LIBPATH)
 endif()
 
 
-# handle the QUIETLY and REQUIRED arguments and set SDL2_FOUND to TRUE if
+# handle the QUIETLY and REQUIRED arguments and set LLVM_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(LLVM DEFAULT_MSG
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LLVM DEFAULT_MSG
     LLVM_LIBRARY)
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   LLVM_LIBRARY
 )

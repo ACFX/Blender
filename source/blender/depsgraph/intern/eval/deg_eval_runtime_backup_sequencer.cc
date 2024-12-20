@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -26,39 +11,53 @@
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
 
-#include "BKE_sequencer.h"
+#include "BLI_assert.h"
+
 #include "BKE_sound.h"
 
-namespace blender {
-namespace deg {
+#include "SEQ_iterator.hh"
 
-SequencerBackup::SequencerBackup(const Depsgraph *depsgraph) : depsgraph(depsgraph)
+namespace blender::deg {
+
+SequencerBackup::SequencerBackup(const Depsgraph *depsgraph) : depsgraph(depsgraph) {}
+
+static bool seq_init_cb(Sequence *seq, void *user_data)
 {
+  SequencerBackup *sb = (SequencerBackup *)user_data;
+  SequenceBackup sequence_backup(sb->depsgraph);
+  sequence_backup.init_from_sequence(seq);
+  if (!sequence_backup.isEmpty()) {
+    const SessionUID &session_uid = seq->runtime.session_uid;
+    BLI_assert(BLI_session_uid_is_generated(&session_uid));
+    sb->sequences_backup.add(session_uid, sequence_backup);
+  }
+  return true;
 }
 
 void SequencerBackup::init_from_scene(Scene *scene)
 {
-  Sequence *sequence;
-  SEQ_BEGIN (scene->ed, sequence) {
-    SequenceBackup sequence_backup(depsgraph);
-    sequence_backup.init_from_sequence(sequence);
-    if (!sequence_backup.isEmpty()) {
-      sequences_backup.add(sequence->orig_sequence, sequence_backup);
-    }
+  if (scene->ed != nullptr) {
+    SEQ_for_each_callback(&scene->ed->seqbase, seq_init_cb, this);
   }
-  SEQ_END;
+}
+
+static bool seq_restore_cb(Sequence *seq, void *user_data)
+{
+  SequencerBackup *sb = (SequencerBackup *)user_data;
+  const SessionUID &session_uid = seq->runtime.session_uid;
+  BLI_assert(BLI_session_uid_is_generated(&session_uid));
+  SequenceBackup *sequence_backup = sb->sequences_backup.lookup_ptr(session_uid);
+  if (sequence_backup != nullptr) {
+    sequence_backup->restore_to_sequence(seq);
+  }
+  return true;
 }
 
 void SequencerBackup::restore_to_scene(Scene *scene)
 {
-  Sequence *sequence;
-  SEQ_BEGIN (scene->ed, sequence) {
-    SequenceBackup *sequence_backup = sequences_backup.lookup_ptr(sequence->orig_sequence);
-    if (sequence_backup != nullptr) {
-      sequence_backup->restore_to_sequence(sequence);
-    }
+  if (scene->ed != nullptr) {
+    SEQ_for_each_callback(&scene->ed->seqbase, seq_restore_cb, this);
   }
-  SEQ_END;
   /* Cleanup audio while the scene is still known. */
   for (SequenceBackup &sequence_backup : sequences_backup.values()) {
     if (sequence_backup.scene_sound != nullptr) {
@@ -67,5 +66,4 @@ void SequencerBackup::restore_to_scene(Scene *scene)
   }
 }
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

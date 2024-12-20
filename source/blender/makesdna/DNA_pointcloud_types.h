@@ -1,60 +1,84 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_POINTCLOUD_TYPES_H__
-#define __DNA_POINTCLOUD_TYPES_H__
+#pragma once
 
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
+
+#ifdef __cplusplus
+#  include <optional>
+
+#  include "BLI_bounds_types.hh"
+#  include "BLI_math_vector_types.hh"
+#  include "BLI_memory_counter_fwd.hh"
+#  include "BLI_span.hh"
+#endif
+
+#ifdef __cplusplus
+namespace blender {
+template<typename T> class Span;
+namespace bke {
+class AttributeAccessor;
+class MutableAttributeAccessor;
+struct PointCloudRuntime;
+}  // namespace bke
+}  // namespace blender
+using PointCloudRuntimeHandle = blender::bke::PointCloudRuntime;
+#else
+typedef struct PointCloudRuntimeHandle PointCloudRuntimeHandle;
+#endif
 
 typedef struct PointCloud {
   ID id;
   struct AnimData *adt; /* animation data (must be immediately after id) */
 
   int flag;
-  int _pad1[1];
 
   /* Geometry */
-  float (*co)[3];
-  float *radius;
   int totpoint;
-  int _pad2[1];
 
   /* Custom Data */
   struct CustomData pdata;
+  /** Set to -1 when none is active. */
+  int attributes_active_index;
+  int _pad4;
 
   /* Material */
   struct Material **mat;
   short totcol;
   short _pad3[3];
 
+#ifdef __cplusplus
+  blender::Span<blender::float3> positions() const;
+  blender::MutableSpan<blender::float3> positions_for_write();
+
+  blender::bke::AttributeAccessor attributes() const;
+  blender::bke::MutableAttributeAccessor attributes_for_write();
+
+  void tag_positions_changed();
+  void tag_radii_changed();
+
+  std::optional<blender::Bounds<blender::float3>> bounds_min_max() const;
+
+  void count_memory(blender::MemoryCounter &memory) const;
+#endif
+
+  PointCloudRuntimeHandle *runtime;
+
   /* Draw Cache */
   void *batch_cache;
 } PointCloud;
 
-/* PointCloud.flag */
+/** #PointCloud.flag */
 enum {
   PT_DS_EXPAND = (1 << 0),
 };
 
 /* Only one material supported currently. */
 #define POINTCLOUD_MATERIAL_NR 1
-
-#endif /* __DNA_POINTCLOUD_TYPES_H__ */

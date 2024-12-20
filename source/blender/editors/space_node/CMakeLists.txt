@@ -1,80 +1,99 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenfont
+  ../io
+  ../../asset_system
   ../../blenkernel
-  ../../blenlib
+  ../../blenloader
   ../../blentranslation
-  ../../depsgraph
+  ../../compositor
+  ../../draw
+  ../../functions
+  ../../geometry
   ../../gpu
   ../../imbuf
-  ../../makesdna
   ../../makesrna
   ../../nodes
-  ../../render/extern/include
-  ../../compositor
+  ../../render
   ../../windowmanager
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
-  ${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
-  drawnode.c
-  node_add.c
-  node_buttons.c
-  node_draw.c
-  node_edit.c
-  node_gizmo.c
-  node_group.c
-  node_ops.c
-  node_relationships.c
-  node_select.c
-  node_templates.c
-  node_toolbar.c
-  node_view.c
-  space_node.c
+  add_menu_assets.cc
+  clipboard.cc
+  drawnode.cc
+  link_drag_search.cc
+  node_add.cc
+  node_context_path.cc
+  node_draw.cc
+  node_edit.cc
+  node_geometry_attribute_search.cc
+  node_gizmo.cc
+  node_group.cc
+  node_ops.cc
+  node_relationships.cc
+  node_select.cc
+  node_shader_preview.cc
+  node_templates.cc
+  node_view.cc
+  space_node.cc
 
-  node_intern.h
+  node_intern.hh
 )
 
 set(LIB
+  PRIVATE bf::animrig
+  PRIVATE bf::blenfont
   bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::blenlib
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
   bf_editor_screen
+  PRIVATE bf::intern::guardedalloc
+  bf_compositor
+  PRIVATE bf::extern::fmtlib
 )
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-if(WITH_COMPOSITOR)
-  add_definitions(-DWITH_COMPOSITOR)
-endif()
 
 if(WITH_OPENIMAGEDENOISE)
   add_definitions(-DWITH_OPENIMAGEDENOISE)
 endif()
 
-add_definitions(${GL_DEFINITIONS})
+if(WITH_OPENSUBDIV)
+  add_definitions(-DWITH_OPENSUBDIV)
+endif()
+
+if(WITH_OPENVDB)
+  list(APPEND INC
+    ../../../../intern/openvdb
+  )
+  list(APPEND INC_SYS
+    ${OPENVDB_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    bf_intern_openvdb
+    ${OPENVDB_LIBRARIES}
+  )
+  add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
+endif()
+
+if(WITH_TBB)
+  if(WIN32)
+    # TBB includes `Windows.h` which will define min/max macros
+    # that will collide with the STL versions.
+    add_definitions(-DNOMINMAX)
+  endif()
+endif()
 
 blender_add_lib(bf_editor_space_node "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh dna_type_offsets.h
+add_dependencies(bf_editor_space_node bf_rna)

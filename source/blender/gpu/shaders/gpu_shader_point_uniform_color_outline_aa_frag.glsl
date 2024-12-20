@@ -1,25 +1,26 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform vec4 color;
-uniform vec4 outlineColor;
+#include "infos/gpu_shader_2D_point_uniform_size_uniform_color_outline_aa_info.hh"
 
-in vec4 radii;
-out vec4 fragColor;
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_2D_point_uniform_size_uniform_color_outline_aa)
 
 void main()
 {
   float dist = length(gl_PointCoord - vec2(0.5));
 
-  // transparent outside of point
-  // --- 0 ---
-  // smooth transition
-  // --- 1 ---
-  // pure outline color
-  // --- 2 ---
-  // smooth transition
-  // --- 3 ---
-  // pure point color
-  // ...
-  // dist = 0 at center of point
+  /* transparent outside of point
+   * --- 0 ---
+   * smooth transition
+   * --- 1 ---
+   * pure outline color
+   * --- 2 ---
+   * smooth transition
+   * --- 3 ---
+   * pure point color
+   * ...
+   * dist = 0 at center of point */
 
   float midStroke = 0.5 * (radii[1] + radii[2]);
 

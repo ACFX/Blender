@@ -31,12 +31,12 @@
 #ifndef CERES_INTERNAL_BLOCK_RANDOM_ACCESS_DENSE_MATRIX_H_
 #define CERES_INTERNAL_BLOCK_RANDOM_ACCESS_DENSE_MATRIX_H_
 
-#include "ceres/block_random_access_matrix.h"
-
 #include <memory>
 #include <vector>
 
-#include "ceres/internal/port.h"
+#include "ceres/block_random_access_matrix.h"
+#include "ceres/internal/disable_warnings.h"
+#include "ceres/internal/export.h"
 
 namespace ceres {
 namespace internal {
@@ -47,11 +47,12 @@ namespace internal {
 // num_rows x num_cols.
 //
 // This class is NOT thread safe. Since all n^2 cells are stored,
-// GetCell never returns NULL for any (row_block_id, col_block_id)
+// GetCell never returns nullptr for any (row_block_id, col_block_id)
 // pair.
 //
 // ReturnCell is a nop.
-class BlockRandomAccessDenseMatrix : public BlockRandomAccessMatrix {
+class CERES_NO_EXPORT BlockRandomAccessDenseMatrix
+    : public BlockRandomAccessMatrix {
  public:
   // blocks is a vector of block sizes. The resulting matrix has
   // blocks.size() * blocks.size() cells.
@@ -61,7 +62,7 @@ class BlockRandomAccessDenseMatrix : public BlockRandomAccessMatrix {
 
   // The destructor is not thread safe. It assumes that no one is
   // modifying any cells when the matrix is being destroyed.
-  virtual ~BlockRandomAccessDenseMatrix();
+  ~BlockRandomAccessDenseMatrix() override;
 
   // BlockRandomAccessMatrix interface.
   CellInfo* GetCell(int row_block_id,
@@ -93,5 +94,7 @@ class BlockRandomAccessDenseMatrix : public BlockRandomAccessMatrix {
 
 }  // namespace internal
 }  // namespace ceres
+
+#include "ceres/internal/reenable_warnings.h"
 
 #endif  // CERES_INTERNAL_BLOCK_RANDOM_ACCESS_DENSE_MATRIX_H_

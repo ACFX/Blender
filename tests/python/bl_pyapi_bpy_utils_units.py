@@ -1,6 +1,8 @@
-# Apache License, Version 2.0
+# SPDX-FileCopyrightText: 2014-2022 Blender Authors
+#
+# SPDX-License-Identifier: Apache-2.0
 
-# ./blender.bin --background -noaudio --python tests/python/bl_pyapi_bpy_utils_units.py -- --verbose
+# ./blender.bin --background --python tests/python/bl_pyapi_bpy_utils_units.py -- --verbose
 import unittest
 
 from bpy.utils import units
@@ -27,6 +29,24 @@ class UnitsTesting(unittest.TestCase):
         ('METRIC', 'LENGTH', "", "1+1ft", 1.3048),  # no metric units, we default to meters.
         ('IMPERIAL', 'LENGTH', "", "3+1in+1ft", 0.3048 * 4 + 0.0254),  # bigger unit becomes default one!
         ('IMPERIAL', 'LENGTH', "", "(3+1)in+1ft", 0.3048 + 0.0254 * 4),
+
+        # Support successive leading unary operators.
+        ('IMPERIAL', 'LENGTH', "", "-1ft", -0.3048),
+        ('IMPERIAL', 'LENGTH', "", "--1ft", --0.3048),
+        ('IMPERIAL', 'LENGTH', "", "---1ft", ---0.3048),
+
+        ('IMPERIAL', 'LENGTH', "", "- 1ft", -0.3048),
+        ('IMPERIAL', 'LENGTH', "", "- - 1ft", --0.3048),
+        ('IMPERIAL', 'LENGTH', "", "- - - 1ft", ---0.3048),
+
+        ('IMPERIAL', 'LENGTH', "", "-+1ft", -+0.3048),
+        ('IMPERIAL', 'LENGTH', "", "+-1ft", +-0.3048),
+
+        ('METRIC', 'LENGTH', "", "~+-32m", ~+-32),
+        ('METRIC', 'LENGTH', "", "-+~32m", -+~32),
+
+        ('METRIC', 'LENGTH', "", "~ + - 32m", ~+-32),
+        ('METRIC', 'LENGTH', "", "- + ~ 32m", -+~32),
     )
 
     # From 'internal' Blender value to user-friendly printing
@@ -54,7 +74,7 @@ class UnitsTesting(unittest.TestCase):
             return ((abs(v1 - v2) / max(abs(v1), abs(v2))) <= e)
 
         for usys, utype, ref, inpt, val in self.INPUT_TESTS:
-            opt_val = units.to_value(usys, utype, inpt, ref)
+            opt_val = units.to_value(usys, utype, inpt, str_ref_unit=ref)
             # Note: almostequal is not good here, precision is fixed on decimal digits, not variable with
             # magnitude of numbers (i.e. 1609.4416 ~= 1609.4456 fails even at 5 of 'places'...).
             self.assertTrue(similar_values(opt_val, val, 1e-7),
@@ -63,7 +83,7 @@ class UnitsTesting(unittest.TestCase):
 
     def test_units_outputs(self):
         for usys, utype, prec, sep, compat, val, output in self.OUTPUT_TESTS:
-            opt_str = units.to_string(usys, utype, val, prec, sep, compat)
+            opt_str = units.to_string(usys, utype, val, precision=prec, split_unit=sep, compatible_unit=compat)
             self.assertEqual(
                 opt_str, output,
                 msg=(

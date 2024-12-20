@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -28,38 +13,42 @@
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
-#include "PIL_time.h"
-#include "PIL_time_utildefines.h"
+#include "BLI_time.h"
+#include "BLI_time_utildefines.h"
 
 #include "DNA_cachefile_types.h"
+#include "DNA_collection_types.h"
+#include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_simulation_types.h"
 
-#include "BKE_main.h"
-#include "BKE_scene.h"
+#include "BKE_collection.hh"
+#include "BKE_main.hh"
+#include "BKE_scene.hh"
 
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
-#include "DEG_depsgraph_debug.h"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_build.hh"
+#include "DEG_depsgraph_debug.hh"
 
-#include "builder/deg_builder.h"
-#include "builder/deg_builder_cache.h"
-#include "builder/deg_builder_cycle.h"
-#include "builder/deg_builder_nodes.h"
 #include "builder/deg_builder_relations.h"
-#include "builder/deg_builder_transitive.h"
+#include "builder/pipeline_all_objects.h"
+#include "builder/pipeline_compositor.h"
+#include "builder/pipeline_from_collection.h"
+#include "builder/pipeline_from_ids.h"
+#include "builder/pipeline_render.h"
+#include "builder/pipeline_view_layer.h"
 
 #include "intern/debug/deg_debug.h"
 
-#include "intern/node/deg_node.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_operation.hh"
 
-#include "intern/depsgraph_registry.h"
-#include "intern/depsgraph_relation.h"
-#include "intern/depsgraph_type.h"
+#include "intern/depsgraph_registry.hh"
+#include "intern/depsgraph_relation.hh"
+#include "intern/depsgraph_tag.hh"
+#include "intern/depsgraph_type.hh"
 
 /* ****************** */
 /* External Build API */
@@ -95,6 +84,24 @@ void DEG_add_scene_relation(DepsNodeHandle *node_handle,
   deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
 }
 
+void DEG_add_scene_camera_relation(DepsNodeHandle *node_handle,
+                                   Scene *scene,
+                                   eDepsObjectComponentType component,
+                                   const char *description)
+{
+  if (scene->camera != nullptr) {
+    DEG_add_object_relation(node_handle, scene->camera, component, description);
+  }
+
+  /* Like DepsgraphNodeBuilder::build_scene_camera(), we also need to account for other cameras
+   * referenced by markers. */
+  LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
+    if (!ELEM(marker->camera, nullptr, scene->camera)) {
+      DEG_add_object_relation(node_handle, marker->camera, component, description);
+    }
+  }
+}
+
 void DEG_add_object_relation(DepsNodeHandle *node_handle,
                              Object *object,
                              eDepsObjectComponentType component,
@@ -106,14 +113,48 @@ void DEG_add_object_relation(DepsNodeHandle *node_handle,
   deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
 }
 
-void DEG_add_simulation_relation(DepsNodeHandle *node_handle,
-                                 Simulation *simulation,
-                                 const char *description)
+bool DEG_object_has_geometry_component(Object *object)
 {
-  deg::OperationKey operation_key(
-      &simulation->id, deg::NodeType::SIMULATION, deg::OperationCode::SIMULATION_EVAL);
+  return deg::geometry_tag_to_component(&object->id) == deg::NodeType::GEOMETRY;
+}
+
+void DEG_add_collection_geometry_relation(DepsNodeHandle *node_handle,
+                                          Collection *collection,
+                                          const char *description)
+{
+  deg::OperationKey operation_key{
+      &collection->id, deg::NodeType::GEOMETRY, deg::OperationCode::GEOMETRY_EVAL_DONE};
   deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
   deg_node_handle->builder->add_node_handle_relation(operation_key, deg_node_handle, description);
+}
+
+void DEG_add_collection_geometry_customdata_mask(DepsNodeHandle *node_handle,
+                                                 Collection *collection,
+                                                 const CustomData_MeshMasks *masks)
+{
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, ob) {
+    DEG_add_customdata_mask(node_handle, ob, masks);
+    if (ob->type == OB_EMPTY && ob->instance_collection != nullptr) {
+      DEG_add_collection_geometry_customdata_mask(node_handle, ob->instance_collection, masks);
+    }
+  }
+  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+}
+
+void DEG_add_node_tree_output_relation(DepsNodeHandle *node_handle,
+                                       bNodeTree *node_tree,
+                                       const char *description)
+{
+  deg::OperationKey ntree_output_key(
+      &node_tree->id, deg::NodeType::NTREE_OUTPUT, deg::OperationCode::NTREE_OUTPUT);
+  deg::OperationKey ntree_preprocess_key(&node_tree->id,
+                                         deg::NodeType::NTREE_GEOMETRY_PREPROCESS,
+                                         deg::OperationCode::NTREE_GEOMETRY_PREPROCESS);
+  deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
+  deg_node_handle->builder->add_node_handle_relation(
+      ntree_output_key, deg_node_handle, description);
+  deg_node_handle->builder->add_node_handle_relation(
+      ntree_preprocess_key, deg_node_handle, description, deg::RELATION_FLAG_NO_FLUSH);
 }
 
 void DEG_add_object_cache_relation(DepsNodeHandle *node_handle,
@@ -139,8 +180,8 @@ void DEG_add_bone_relation(DepsNodeHandle *node_handle,
   deg_node_handle->builder->add_node_handle_relation(comp_key, deg_node_handle, description);
 }
 
-void DEG_add_object_pointcache_relation(struct DepsNodeHandle *node_handle,
-                                        struct Object *object,
+void DEG_add_object_pointcache_relation(DepsNodeHandle *node_handle,
+                                        Object *object,
                                         eDepsObjectComponentType component,
                                         const char *description)
 {
@@ -162,9 +203,7 @@ void DEG_add_object_pointcache_relation(struct DepsNodeHandle *node_handle,
   }
 }
 
-void DEG_add_generic_id_relation(struct DepsNodeHandle *node_handle,
-                                 struct ID *id,
-                                 const char *description)
+void DEG_add_generic_id_relation(DepsNodeHandle *node_handle, ID *id, const char *description)
 {
   deg::OperationKey operation_key(
       id, deg::NodeType::GENERIC_DATABLOCK, deg::OperationCode::GENERIC_DATABLOCK_UPDATE);
@@ -172,34 +211,33 @@ void DEG_add_generic_id_relation(struct DepsNodeHandle *node_handle,
   deg_node_handle->builder->add_node_handle_relation(operation_key, deg_node_handle, description);
 }
 
-void DEG_add_modifier_to_transform_relation(struct DepsNodeHandle *node_handle,
-                                            const char *description)
+void DEG_add_depends_on_transform_relation(DepsNodeHandle *node_handle, const char *description)
 {
   deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
-  deg_node_handle->builder->add_modifier_to_transform_relation(deg_node_handle, description);
+  deg_node_handle->builder->add_depends_on_transform_relation(deg_node_handle, description);
 }
 
-void DEG_add_special_eval_flag(struct DepsNodeHandle *node_handle, ID *id, uint32_t flag)
+void DEG_add_special_eval_flag(DepsNodeHandle *node_handle, ID *id, uint32_t flag)
 {
   deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
   deg_node_handle->builder->add_special_eval_flag(id, flag);
 }
 
-void DEG_add_customdata_mask(struct DepsNodeHandle *node_handle,
-                             struct Object *object,
+void DEG_add_customdata_mask(DepsNodeHandle *node_handle,
+                             Object *object,
                              const CustomData_MeshMasks *masks)
 {
   deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
   deg_node_handle->builder->add_customdata_mask(object, deg::DEGCustomDataMeshMasks(masks));
 }
 
-struct ID *DEG_get_id_from_handle(struct DepsNodeHandle *node_handle)
+ID *DEG_get_id_from_handle(DepsNodeHandle *node_handle)
 {
   deg::DepsNodeHandle *deg_handle = get_node_handle(node_handle);
   return deg_handle->node->owner->owner->id_orig;
 }
 
-struct Depsgraph *DEG_get_graph_from_handle(struct DepsNodeHandle *node_handle)
+Depsgraph *DEG_get_graph_from_handle(DepsNodeHandle *node_handle)
 {
   deg::DepsNodeHandle *deg_node_handle = get_node_handle(node_handle);
   deg::DepsgraphRelationBuilder *relation_builder = deg_node_handle->builder;
@@ -209,309 +247,73 @@ struct Depsgraph *DEG_get_graph_from_handle(struct DepsNodeHandle *node_handle)
 /* ******************** */
 /* Graph Building API's */
 
-static void graph_build_finalize_common(deg::Depsgraph *deg_graph, Main *bmain)
+void DEG_graph_build_from_view_layer(Depsgraph *graph)
 {
-  /* Detect and solve cycles. */
-  deg::deg_graph_detect_cycles(deg_graph);
-  /* Simplify the graph by removing redundant relations (to optimize
-   * traversal later). */
-  /* TODO: it would be useful to have an option to disable this in cases where
-   *       it is causing trouble. */
-  if (G.debug_value == 799) {
-    deg::deg_graph_transitive_reduction(deg_graph);
-  }
-  /* Store pointers to commonly used valuated datablocks. */
-  deg_graph->scene_cow = (Scene *)deg_graph->get_cow_id(&deg_graph->scene->id);
-  /* Flush visibility layer and re-schedule nodes for update. */
-  deg::deg_graph_build_finalize(bmain, deg_graph);
-  DEG_graph_on_visible_update(bmain, reinterpret_cast<::Depsgraph *>(deg_graph), false);
-#if 0
-  if (!DEG_debug_consistency_check(deg_graph)) {
-    printf("Consistency validation failed, ABORTING!\n");
-    abort();
-  }
-#endif
-  /* Relations are up to date. */
-  deg_graph->need_update = false;
+  deg::ViewLayerBuilderPipeline builder(graph);
+  builder.build();
 }
 
-/* Build depsgraph for the given scene layer, and dump results in given graph container. */
-void DEG_graph_build_from_view_layer(Depsgraph *graph,
-                                     Main *bmain,
-                                     Scene *scene,
-                                     ViewLayer *view_layer)
+void DEG_graph_build_for_all_objects(Depsgraph *graph)
 {
-  double start_time = 0.0;
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    start_time = PIL_check_seconds_timer();
-  }
-  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
-  /* Perform sanity checks. */
-  BLI_assert(BLI_findindex(&scene->view_layers, view_layer) != -1);
-  BLI_assert(deg_graph->scene == scene);
-  BLI_assert(deg_graph->view_layer == view_layer);
-  deg::DepsgraphBuilderCache builder_cache;
-  /* Generate all the nodes in the graph first */
-  deg::DepsgraphNodeBuilder node_builder(bmain, deg_graph, &builder_cache);
-  node_builder.begin_build();
-  node_builder.build_view_layer(scene, view_layer, deg::DEG_ID_LINKED_DIRECTLY);
-  node_builder.end_build();
-  /* Hook up relationships between operations - to determine evaluation order. */
-  deg::DepsgraphRelationBuilder relation_builder(bmain, deg_graph, &builder_cache);
-  relation_builder.begin_build();
-  relation_builder.build_view_layer(scene, view_layer, deg::DEG_ID_LINKED_DIRECTLY);
-  relation_builder.build_copy_on_write_relations();
-  relation_builder.build_driver_relations();
-  /* Finalize building. */
-  graph_build_finalize_common(deg_graph, bmain);
-  /* Finish statistics. */
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    printf("Depsgraph built in %f seconds.\n", PIL_check_seconds_timer() - start_time);
-  }
+  deg::AllObjectsBuilderPipeline builder(graph);
+  builder.build();
 }
 
-void DEG_graph_build_for_render_pipeline(Depsgraph *graph,
-                                         Main *bmain,
-                                         Scene *scene,
-                                         ViewLayer *view_layer)
+void DEG_graph_build_for_render_pipeline(Depsgraph *graph)
 {
-  double start_time = 0.0;
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    start_time = PIL_check_seconds_timer();
-  }
-  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
-  /* Perform sanity checks. */
-  BLI_assert(deg_graph->scene == scene);
-  deg_graph->is_render_pipeline_depsgraph = true;
-  deg::DepsgraphBuilderCache builder_cache;
-  /* Generate all the nodes in the graph first */
-  deg::DepsgraphNodeBuilder node_builder(bmain, deg_graph, &builder_cache);
-  node_builder.begin_build();
-  node_builder.build_scene_render(scene, view_layer);
-  node_builder.end_build();
-  /* Hook up relationships between operations - to determine evaluation
-   * order. */
-  deg::DepsgraphRelationBuilder relation_builder(bmain, deg_graph, &builder_cache);
-  relation_builder.begin_build();
-  relation_builder.build_scene_render(scene, view_layer);
-  relation_builder.build_copy_on_write_relations();
-  relation_builder.build_driver_relations();
-  /* Finalize building. */
-  graph_build_finalize_common(deg_graph, bmain);
-  /* Finish statistics. */
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    printf("Depsgraph built in %f seconds.\n", PIL_check_seconds_timer() - start_time);
-  }
+  deg::RenderBuilderPipeline builder(graph);
+  builder.build();
 }
 
-void DEG_graph_build_for_compositor_preview(
-    Depsgraph *graph, Main *bmain, Scene *scene, struct ViewLayer *view_layer, bNodeTree *nodetree)
+void DEG_graph_build_for_compositor_preview(Depsgraph *graph, bNodeTree *nodetree)
 {
-  double start_time = 0.0;
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    start_time = PIL_check_seconds_timer();
-  }
-  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
-  /* Perform sanity checks. */
-  BLI_assert(deg_graph->scene == scene);
-  deg_graph->is_render_pipeline_depsgraph = true;
-  deg::DepsgraphBuilderCache builder_cache;
-  /* Generate all the nodes in the graph first */
-  deg::DepsgraphNodeBuilder node_builder(bmain, deg_graph, &builder_cache);
-  node_builder.begin_build();
-  node_builder.build_scene_render(scene, view_layer);
-  node_builder.build_nodetree(nodetree);
-  node_builder.end_build();
-  /* Hook up relationships between operations - to determine evaluation
-   * order. */
-  deg::DepsgraphRelationBuilder relation_builder(bmain, deg_graph, &builder_cache);
-  relation_builder.begin_build();
-  relation_builder.build_scene_render(scene, view_layer);
-  relation_builder.build_nodetree(nodetree);
-  relation_builder.build_copy_on_write_relations();
-  relation_builder.build_driver_relations();
-  /* Finalize building. */
-  graph_build_finalize_common(deg_graph, bmain);
-  /* Finish statistics. */
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    printf("Depsgraph built in %f seconds.\n", PIL_check_seconds_timer() - start_time);
-  }
+  deg::CompositorBuilderPipeline builder(graph, nodetree);
+  builder.build();
 }
 
-/* Optimized builders for dependency graph built from a given set of IDs.
- *
- * General notes:
- *
- * - We pull in all bases if their objects are in the set of IDs. This allows to have proper
- *   visibility and other flags assigned to the objects.
- *   All other bases (the ones which points to object which is outside of the set of IDs) are
- *   completely ignored.
- *
- * - Proxy groups pointing to objects which are outside of the IDs set are also ignored.
- *   This way we avoid high-poly character body pulled into the dependency graph when it's coming
- *   from a library into an animation file and the dependency graph constructed for a proxy rig. */
-
-namespace blender {
-namespace deg {
-namespace {
-
-class DepsgraphFromIDsFilter {
- public:
-  DepsgraphFromIDsFilter(ID **ids, const int num_ids)
-  {
-    for (int i = 0; i < num_ids; ++i) {
-      ids_.add(ids[i]);
-    }
-  }
-
-  bool contains(ID *id)
-  {
-    return ids_.contains(id);
-  }
-
- protected:
-  Set<ID *> ids_;
-};
-
-class DepsgraphFromIDsNodeBuilder : public DepsgraphNodeBuilder {
- public:
-  DepsgraphFromIDsNodeBuilder(
-      Main *bmain, Depsgraph *graph, DepsgraphBuilderCache *cache, ID **ids, const int num_ids)
-      : DepsgraphNodeBuilder(bmain, graph, cache), filter_(ids, num_ids)
-  {
-  }
-
-  virtual bool need_pull_base_into_graph(Base *base) override
-  {
-    if (!filter_.contains(&base->object->id)) {
-      return false;
-    }
-    return DepsgraphNodeBuilder::need_pull_base_into_graph(base);
-  }
-
-  virtual void build_object_proxy_group(Object *object, bool is_visible) override
-  {
-    if (object->proxy_group == nullptr) {
-      return;
-    }
-    if (!filter_.contains(&object->proxy_group->id)) {
-      return;
-    }
-    DepsgraphNodeBuilder::build_object_proxy_group(object, is_visible);
-  }
-
- protected:
-  DepsgraphFromIDsFilter filter_;
-};
-
-class DepsgraphFromIDsRelationBuilder : public DepsgraphRelationBuilder {
- public:
-  DepsgraphFromIDsRelationBuilder(
-      Main *bmain, Depsgraph *graph, DepsgraphBuilderCache *cache, ID **ids, const int num_ids)
-      : DepsgraphRelationBuilder(bmain, graph, cache), filter_(ids, num_ids)
-  {
-  }
-
-  virtual bool need_pull_base_into_graph(Base *base) override
-  {
-    if (!filter_.contains(&base->object->id)) {
-      return false;
-    }
-    return DepsgraphRelationBuilder::need_pull_base_into_graph(base);
-  }
-
-  virtual void build_object_proxy_group(Object *object) override
-  {
-    if (object->proxy_group == nullptr) {
-      return;
-    }
-    if (!filter_.contains(&object->proxy_group->id)) {
-      return;
-    }
-    DepsgraphRelationBuilder::build_object_proxy_group(object);
-  }
-
- protected:
-  DepsgraphFromIDsFilter filter_;
-};
-
-}  // namespace
-}  // namespace deg
-}  // namespace blender
-
-void DEG_graph_build_from_ids(Depsgraph *graph,
-                              Main *bmain,
-                              Scene *scene,
-                              ViewLayer *view_layer,
-                              ID **ids,
-                              const int num_ids)
+void DEG_graph_build_from_ids(Depsgraph *graph, blender::Span<ID *> ids)
 {
-  double start_time = 0.0;
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    start_time = PIL_check_seconds_timer();
-  }
-  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
-  /* Perform sanity checks. */
-  BLI_assert(BLI_findindex(&scene->view_layers, view_layer) != -1);
-  BLI_assert(deg_graph->scene == scene);
-  BLI_assert(deg_graph->view_layer == view_layer);
-  deg::DepsgraphBuilderCache builder_cache;
-  /* Generate all the nodes in the graph first */
-  deg::DepsgraphFromIDsNodeBuilder node_builder(bmain, deg_graph, &builder_cache, ids, num_ids);
-  node_builder.begin_build();
-  node_builder.build_view_layer(scene, view_layer, deg::DEG_ID_LINKED_DIRECTLY);
-  for (int i = 0; i < num_ids; ++i) {
-    node_builder.build_id(ids[i]);
-  }
-  node_builder.end_build();
-  /* Hook up relationships between operations - to determine evaluation order. */
-  deg::DepsgraphFromIDsRelationBuilder relation_builder(
-      bmain, deg_graph, &builder_cache, ids, num_ids);
-  relation_builder.begin_build();
-  relation_builder.build_view_layer(scene, view_layer, deg::DEG_ID_LINKED_DIRECTLY);
-  for (int i = 0; i < num_ids; ++i) {
-    relation_builder.build_id(ids[i]);
-  }
-  relation_builder.build_copy_on_write_relations();
-  relation_builder.build_driver_relations();
-  /* Finalize building. */
-  graph_build_finalize_common(deg_graph, bmain);
-  /* Finish statistics. */
-  if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    printf("Depsgraph built in %f seconds.\n", PIL_check_seconds_timer() - start_time);
-  }
+  deg::FromIDsBuilderPipeline builder(graph, ids);
+  builder.build();
 }
 
-/* Tag graph relations for update. */
+void DEG_graph_build_from_collection(Depsgraph *graph, Collection *collection)
+{
+  deg::FromCollectionBuilderPipeline builder(graph, collection);
+  builder.build();
+}
+
 void DEG_graph_tag_relations_update(Depsgraph *graph)
 {
   DEG_DEBUG_PRINTF(graph, TAG, "%s: Tagging relations for update.\n", __func__);
   deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(graph);
-  deg_graph->need_update = true;
-  /* NOTE: When relations are updated, it's quite possible that
-   * we've got new bases in the scene. This means, we need to
-   * re-create flat array of bases in view layer.
-   *
-   * TODO(sergey): Try to make it so we don't flush updates
-   * to the whole depsgraph. */
+  deg_graph->need_update_relations = true;
+
+  /* NOTE: When relations are updated, it's quite possible that we've got new bases in the scene.
+   * This means, we need to re-create flat array of bases in view layer. */
+  /* TODO(sergey): It is expected that bases manipulation tags scene for update to tag bases array
+   * for re-creation. Once it is ensured to happen from all places this implicit tag can be
+   * removed. */
   deg::IDNode *id_node = deg_graph->find_id_node(&deg_graph->scene->id);
   if (id_node != nullptr) {
-    id_node->tag_update(deg_graph, deg::DEG_UPDATE_SOURCE_RELATIONS);
+    graph_id_tag_update(deg_graph->bmain,
+                        deg_graph,
+                        &deg_graph->scene->id,
+                        ID_RECALC_BASE_FLAGS | ID_RECALC_HIERARCHY,
+                        deg::DEG_UPDATE_SOURCE_RELATIONS);
   }
 }
 
-/* Create or update relations in the specified graph. */
-void DEG_graph_relations_update(Depsgraph *graph, Main *bmain, Scene *scene, ViewLayer *view_layer)
+void DEG_graph_relations_update(Depsgraph *graph)
 {
   deg::Depsgraph *deg_graph = (deg::Depsgraph *)graph;
-  if (!deg_graph->need_update) {
+  if (!deg_graph->need_update_relations) {
     /* Graph is up to date, nothing to do. */
     return;
   }
-  DEG_graph_build_from_view_layer(graph, bmain, scene, view_layer);
+  DEG_graph_build_from_view_layer(graph);
 }
 
-/* Tag all relations for update. */
 void DEG_relations_tag_update(Main *bmain)
 {
   DEG_GLOBAL_DEBUG_PRINTF(TAG, "%s: Tagging relations for update.\n", __func__);

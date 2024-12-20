@@ -1,4 +1,6 @@
 Project: Ceres Solver
 URL: http://ceres-solver.org/
-Upstream version 1.11 (aef9c9563b08d5f39eee1576af133a84749d1b48)
+License: SPDX:BSD-3-Clause
+Upstream version 2.1.0
+Copyright: Copyright 2015 Google Inc. All rights reserved.
 Local modifications: None

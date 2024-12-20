@@ -1,5 +1,5 @@
 // Ceres Solver - A fast non-linear least squares minimizer
-// Copyright 2018 Google Inc. All rights reserved.
+// Copyright 2022 Google Inc. All rights reserved.
 // http://ceres-solver.org/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -33,9 +33,12 @@
 #ifndef CERES_INTERNAL_PAIR_HASH_H_
 #define CERES_INTERNAL_PAIR_HASH_H_
 
-#include "ceres/internal/port.h"
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <utility>
+
+#include "ceres/internal/export.h"
 
 namespace ceres {
 namespace internal {
@@ -52,6 +55,8 @@ namespace internal {
 // http://burtleburtle.net/bob/hash/index.html). Each mix takes 36 instructions,
 // in 18 cycles if you're lucky. On x86 architectures, this requires 45
 // instructions in 27 cycles, if you're lucky.
+//
+// clang-format off
 //
 // 32bit version
 inline void hash_mix(uint32_t& a, uint32_t& b, uint32_t& c) {
@@ -78,6 +83,7 @@ inline void hash_mix(uint64_t& a, uint64_t& b, uint64_t& c) {
   b -= c; b -= a; b ^= (a<<49);
   c -= a; c -= b; c ^= (b>>11);
 }
+// clang-format on
 
 inline uint32_t Hash32NumWithSeed(uint32_t num, uint32_t c) {
   // The golden ratio; an arbitrary value.

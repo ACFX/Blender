@@ -1,131 +1,89 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2005 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup shdnodes
  */
 
-#include "node_shader_util.h"
+#include "node_shader_util.hh"
+#include "node_util.hh"
+
+#include "NOD_inverse_eval_params.hh"
+#include "NOD_math_functions.hh"
+#include "NOD_multi_function.hh"
+#include "NOD_socket_search_link.hh"
+#include "NOD_value_elem_eval.hh"
+
+#include "RNA_enum_types.hh"
 
 /* **************** SCALAR MATH ******************** */
-static bNodeSocketTemplate sh_node_math_in[] = {
-    {SOCK_FLOAT, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
-    {SOCK_FLOAT, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
-    {SOCK_FLOAT, N_("Value"), 0.0f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
-    {-1, ""}};
 
-static bNodeSocketTemplate sh_node_math_out[] = {{SOCK_FLOAT, N_("Value")}, {-1, ""}};
+namespace blender::nodes::node_shader_math_cc {
+
+static void sh_node_math_declare(NodeDeclarationBuilder &b)
+{
+  b.is_function_node();
+  b.add_input<decl::Float>("Value").default_value(0.5f).min(-10000.0f).max(10000.0f);
+  b.add_input<decl::Float>("Value", "Value_001").default_value(0.5f).min(-10000.0f).max(10000.0f);
+  b.add_input<decl::Float>("Value", "Value_002").default_value(0.5f).min(-10000.0f).max(10000.0f);
+  b.add_output<decl::Float>("Value");
+}
+
+class SocketSearchOp {
+ public:
+  std::string socket_name;
+  NodeMathOperation mode = NODE_MATH_ADD;
+  void operator()(LinkSearchOpParams &params)
+  {
+    bNode &node = params.add_node("ShaderNodeMath");
+    node.custom1 = mode;
+    params.update_and_connect_available_socket(node, socket_name);
+  }
+};
+
+static void sh_node_math_gather_link_searches(GatherLinkSearchOpParams &params)
+{
+  if (!params.node_tree().typeinfo->validate_link(
+          static_cast<eNodeSocketDatatype>(params.other_socket().type), SOCK_FLOAT))
+  {
+    return;
+  }
+
+  const bool is_geometry_node_tree = params.node_tree().type == NTREE_GEOMETRY;
+  const int weight = ELEM(params.other_socket().type, SOCK_FLOAT, SOCK_INT, SOCK_BOOLEAN) ? 0 : -1;
+
+  for (const EnumPropertyItem *item = rna_enum_node_math_items; item->identifier != nullptr;
+       item++)
+  {
+    if (item->name != nullptr && item->identifier[0] != '\0') {
+      const int gn_weight =
+          (is_geometry_node_tree &&
+           ELEM(item->value, NODE_MATH_COMPARE, NODE_MATH_GREATER_THAN, NODE_MATH_LESS_THAN)) ?
+              -1 :
+              weight;
+      params.add_item(CTX_IFACE_(BLT_I18NCONTEXT_ID_NODETREE, item->name),
+                      SocketSearchOp{"Value", (NodeMathOperation)item->value},
+                      gn_weight);
+    }
+  }
+}
 
 static const char *gpu_shader_get_name(int mode)
 {
-  switch (mode) {
-    case NODE_MATH_ADD:
-      return "math_add";
-    case NODE_MATH_SUBTRACT:
-      return "math_subtract";
-    case NODE_MATH_MULTIPLY:
-      return "math_multiply";
-    case NODE_MATH_DIVIDE:
-      return "math_divide";
-    case NODE_MATH_MULTIPLY_ADD:
-      return "math_multiply_add";
-
-    case NODE_MATH_POWER:
-      return "math_power";
-    case NODE_MATH_LOGARITHM:
-      return "math_logarithm";
-    case NODE_MATH_EXPONENT:
-      return "math_exponent";
-    case NODE_MATH_SQRT:
-      return "math_sqrt";
-    case NODE_MATH_INV_SQRT:
-      return "math_inversesqrt";
-    case NODE_MATH_ABSOLUTE:
-      return "math_absolute";
-    case NODE_MATH_RADIANS:
-      return "math_radians";
-    case NODE_MATH_DEGREES:
-      return "math_degrees";
-
-    case NODE_MATH_MINIMUM:
-      return "math_minimum";
-    case NODE_MATH_MAXIMUM:
-      return "math_maximum";
-    case NODE_MATH_LESS_THAN:
-      return "math_less_than";
-    case NODE_MATH_GREATER_THAN:
-      return "math_greater_than";
-    case NODE_MATH_SIGN:
-      return "math_sign";
-    case NODE_MATH_COMPARE:
-      return "math_compare";
-    case NODE_MATH_SMOOTH_MIN:
-      return "math_smoothmin";
-    case NODE_MATH_SMOOTH_MAX:
-      return "math_smoothmax";
-
-    case NODE_MATH_ROUND:
-      return "math_round";
-    case NODE_MATH_FLOOR:
-      return "math_floor";
-    case NODE_MATH_CEIL:
-      return "math_ceil";
-    case NODE_MATH_FRACTION:
-      return "math_fraction";
-    case NODE_MATH_MODULO:
-      return "math_modulo";
-    case NODE_MATH_TRUNC:
-      return "math_trunc";
-    case NODE_MATH_SNAP:
-      return "math_snap";
-    case NODE_MATH_WRAP:
-      return "math_wrap";
-    case NODE_MATH_PINGPONG:
-      return "math_pingpong";
-
-    case NODE_MATH_SINE:
-      return "math_sine";
-    case NODE_MATH_COSINE:
-      return "math_cosine";
-    case NODE_MATH_TANGENT:
-      return "math_tangent";
-    case NODE_MATH_SINH:
-      return "math_sinh";
-    case NODE_MATH_COSH:
-      return "math_cosh";
-    case NODE_MATH_TANH:
-      return "math_tanh";
-    case NODE_MATH_ARCSINE:
-      return "math_arcsine";
-    case NODE_MATH_ARCCOSINE:
-      return "math_arccosine";
-    case NODE_MATH_ARCTANGENT:
-      return "math_arctangent";
-    case NODE_MATH_ARCTAN2:
-      return "math_arctan2";
+  const FloatMathOperationInfo *info = get_float_math_operation_info(mode);
+  if (!info) {
+    return nullptr;
   }
-  return nullptr;
+  if (info->shader_name.is_empty()) {
+    return nullptr;
+  }
+  return info->shader_name.c_str();
 }
 
 static int gpu_shader_math(GPUMaterial *mat,
                            bNode *node,
-                           bNodeExecData *UNUSED(execdata),
+                           bNodeExecData * /*execdata*/,
                            GPUNodeStack *in,
                            GPUNodeStack *out)
 {
@@ -141,56 +99,281 @@ static int gpu_shader_math(GPUMaterial *mat,
     }
     return ret;
   }
-  else {
-    return 0;
-  }
+
+  return 0;
 }
 
-static void sh_node_math_expand_in_mf_network(blender::bke::NodeMFNetworkBuilder &builder)
+static void node_eval_elem(value_elem::ElemEvalParams &params)
 {
-  /* TODO: Implement clamp and other operations. */
-  const int mode = builder.bnode().custom1;
-  switch (mode) {
-    case NODE_MATH_ADD: {
-      static blender::fn::CustomMF_SI_SI_SO<float, float, float> fn{
-          "Add", [](float a, float b) { return a + b; }};
-      builder.set_matching_fn(fn);
-      break;
-    }
-    case NODE_MATH_SUBTRACT: {
-      static blender::fn::CustomMF_SI_SI_SO<float, float, float> fn{
-          "Subtract", [](float a, float b) { return a - b; }};
-      builder.set_matching_fn(fn);
-      break;
-    }
-    case NODE_MATH_MULTIPLY: {
-      static blender::fn::CustomMF_SI_SI_SO<float, float, float> fn{
-          "Multiply", [](float a, float b) { return a * b; }};
-      builder.set_matching_fn(fn);
-      break;
-    }
+  using namespace value_elem;
+  const NodeMathOperation op = NodeMathOperation(params.node.custom1);
+  switch (op) {
+    case NODE_MATH_ADD:
+    case NODE_MATH_SUBTRACT:
+    case NODE_MATH_MULTIPLY:
     case NODE_MATH_DIVIDE: {
-      static blender::fn::CustomMF_SI_SI_SO<float, float, float> fn{
-          "Divide", [](float a, float b) { return (b != 0.0f) ? a / b : 0.0f; }};
-      builder.set_matching_fn(fn);
+      FloatElem output_elem = params.get_input_elem<FloatElem>("Value");
+      output_elem.merge(params.get_input_elem<FloatElem>("Value_001"));
+      params.set_output_elem("Value", output_elem);
       break;
     }
     default:
-      BLI_assert(false);
       break;
   }
 }
 
-void register_node_type_sh_math(void)
+static void node_eval_inverse_elem(value_elem::InverseElemEvalParams &params)
 {
-  static bNodeType ntype;
+  const NodeMathOperation op = NodeMathOperation(params.node.custom1);
+  switch (op) {
+    case NODE_MATH_ADD:
+    case NODE_MATH_SUBTRACT:
+    case NODE_MATH_MULTIPLY:
+    case NODE_MATH_DIVIDE: {
+      params.set_input_elem("Value", params.get_output_elem<value_elem::FloatElem>("Value"));
+      break;
+    }
+    default:
+      break;
+  }
+}
 
-  sh_fn_node_type_base(&ntype, SH_NODE_MATH, "Math", NODE_CLASS_CONVERTOR, 0);
-  node_type_socket_templates(&ntype, sh_node_math_in, sh_node_math_out);
-  node_type_label(&ntype, node_math_label);
-  node_type_gpu(&ntype, gpu_shader_math);
-  node_type_update(&ntype, node_math_update);
-  ntype.expand_in_mf_network = sh_node_math_expand_in_mf_network;
+static void node_eval_inverse(inverse_eval::InverseEvalParams &params)
+{
+  const NodeMathOperation op = NodeMathOperation(params.node.custom1);
+  const StringRef first_input_id = "Value";
+  const StringRef second_input_id = "Value_001";
+  const StringRef output_id = "Value";
+  switch (op) {
+    case NODE_MATH_ADD: {
+      params.set_input(first_input_id,
+                       params.get_output<float>(output_id) -
+                           params.get_input<float>(second_input_id));
+      break;
+    }
+    case NODE_MATH_SUBTRACT: {
+      params.set_input(first_input_id,
+                       params.get_output<float>(output_id) +
+                           params.get_input<float>(second_input_id));
+      break;
+    }
+    case NODE_MATH_MULTIPLY: {
+      params.set_input(first_input_id,
+                       math::safe_divide(params.get_output<float>(output_id),
+                                         params.get_input<float>(second_input_id)));
+      break;
+    }
+    case NODE_MATH_DIVIDE: {
+      params.set_input(first_input_id,
+                       params.get_output<float>(output_id) *
+                           params.get_input<float>(second_input_id));
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+}
 
-  nodeRegisterType(&ntype);
+NODE_SHADER_MATERIALX_BEGIN
+#ifdef WITH_MATERIALX
+{
+  NodeMathOperation op = NodeMathOperation(node_->custom1);
+  NodeItem res = empty();
+
+  /* Single operand operations */
+  NodeItem x = get_input_value(0, NodeItem::Type::Float);
+
+  switch (op) {
+    case NODE_MATH_SINE:
+      res = x.sin();
+      break;
+    case NODE_MATH_COSINE:
+      res = x.cos();
+      break;
+    case NODE_MATH_TANGENT:
+      res = x.tan();
+      break;
+    case NODE_MATH_ARCSINE:
+      res = x.asin();
+      break;
+    case NODE_MATH_ARCCOSINE:
+      res = x.acos();
+      break;
+    case NODE_MATH_ARCTANGENT:
+      res = x.atan();
+      break;
+    case NODE_MATH_ROUND:
+      res = (x + val(0.5f)).floor();
+      break;
+    case NODE_MATH_ABSOLUTE:
+      res = x.abs();
+      break;
+    case NODE_MATH_FLOOR:
+      res = x.floor();
+      break;
+    case NODE_MATH_CEIL:
+      res = x.ceil();
+      break;
+    case NODE_MATH_FRACTION:
+      res = x % val(1.0f);
+      break;
+    case NODE_MATH_SQRT:
+      res = x.sqrt();
+      break;
+    case NODE_MATH_INV_SQRT:
+      res = val(1.0f) / x.sqrt();
+      break;
+    case NODE_MATH_SIGN:
+      res = x.sign();
+      break;
+    case NODE_MATH_EXPONENT:
+      res = x.exp();
+      break;
+    case NODE_MATH_RADIANS:
+      res = x * val(float(M_PI) / 180.0f);
+      break;
+    case NODE_MATH_DEGREES:
+      res = x * val(180.0f * float(M_1_PI));
+      break;
+    case NODE_MATH_SINH:
+      res = x.sinh();
+      break;
+    case NODE_MATH_COSH:
+      res = x.cosh();
+      break;
+    case NODE_MATH_TANH:
+      res = x.tanh();
+      break;
+    case NODE_MATH_TRUNC:
+      res = x.sign() * x.abs().floor();
+      break;
+
+    default: {
+      /* 2-operand operations */
+      NodeItem y = get_input_value(1, NodeItem::Type::Float);
+
+      switch (op) {
+        case NODE_MATH_ADD:
+          res = x + y;
+          break;
+        case NODE_MATH_SUBTRACT:
+          res = x - y;
+          break;
+        case NODE_MATH_MULTIPLY:
+          res = x * y;
+          break;
+        case NODE_MATH_DIVIDE:
+          res = x / y;
+          break;
+        case NODE_MATH_POWER:
+          res = x ^ y;
+          break;
+        case NODE_MATH_LOGARITHM:
+          res = x.ln() / y.ln();
+          break;
+        case NODE_MATH_MINIMUM:
+          res = x.min(y);
+          break;
+        case NODE_MATH_MAXIMUM:
+          res = x.max(y);
+          break;
+        case NODE_MATH_LESS_THAN:
+          res = x.if_else(NodeItem::CompareOp::Less, y, val(1.0f), val(0.0f));
+          break;
+        case NODE_MATH_GREATER_THAN:
+          res = x.if_else(NodeItem::CompareOp::Greater, y, val(1.0f), val(0.0f));
+          break;
+        case NODE_MATH_MODULO:
+          res = x % y;
+          break;
+        case NODE_MATH_ARCTAN2:
+          res = x.atan2(y);
+          break;
+        case NODE_MATH_SNAP:
+          res = (x / y).floor() * y;
+          break;
+        case NODE_MATH_PINGPONG: {
+          NodeItem fract_part = (x - y) / (y * val(2.0f));
+          NodeItem if_branch = ((fract_part - fract_part.floor()) * y * val(2.0f) - y).abs();
+          res = y.if_else(NodeItem::CompareOp::NotEq, val(0.0f), if_branch, val(0.0f));
+          break;
+        }
+        case NODE_MATH_FLOORED_MODULO:
+          res = y.if_else(
+              NodeItem::CompareOp::NotEq, val(0.0f), (x - (x / y).floor() * y), val(0.0f));
+          break;
+
+        default: {
+          /* 3-operand operations */
+          NodeItem z = get_input_value(2, NodeItem::Type::Float);
+
+          switch (op) {
+            case NODE_MATH_WRAP: {
+              NodeItem range = (y - z);
+              NodeItem if_branch = x - (range * ((x - z) / range).floor());
+              res = range.if_else(NodeItem::CompareOp::NotEq, val(0.0f), if_branch, z);
+              break;
+            }
+            case NODE_MATH_COMPARE:
+              res = z.if_else(NodeItem::CompareOp::Less, (x - y).abs(), val(1.0f), val(0.0f));
+              break;
+            case NODE_MATH_MULTIPLY_ADD:
+              res = x * y + z;
+              break;
+            case NODE_MATH_SMOOTH_MIN:
+            case NODE_MATH_SMOOTH_MAX: {
+              auto make_smoothmin = [&](NodeItem a, NodeItem b, NodeItem k) {
+                NodeItem h = (k - (a - b).abs()).max(val(0.0f)) / k;
+                NodeItem if_branch = a.min(b) - h * h * h * k * val(1.0f / 6.0f);
+                return k.if_else(NodeItem::CompareOp::NotEq, val(0.0f), if_branch, a.min(b));
+              };
+              if (op == NODE_MATH_SMOOTH_MIN) {
+                res = make_smoothmin(x, y, z);
+              }
+              else {
+                res = -make_smoothmin(-x, -y, -z);
+              }
+              break;
+            }
+            default:
+              BLI_assert_unreachable();
+          }
+        }
+      }
+    }
+  }
+
+  bool clamp_output = node_->custom2 != 0;
+  if (clamp_output && res) {
+    res = res.clamp();
+  }
+
+  return res;
+}
+#endif
+NODE_SHADER_MATERIALX_END
+
+}  // namespace blender::nodes::node_shader_math_cc
+
+void register_node_type_sh_math()
+{
+  namespace file_ns = blender::nodes::node_shader_math_cc;
+
+  static blender::bke::bNodeType ntype;
+
+  sh_fn_node_type_base(&ntype, SH_NODE_MATH, "Math", NODE_CLASS_CONVERTER);
+  ntype.enum_name_legacy = "MATH";
+  ntype.declare = file_ns::sh_node_math_declare;
+  ntype.labelfunc = node_math_label;
+  ntype.gpu_fn = file_ns::gpu_shader_math;
+  ntype.updatefunc = node_math_update;
+  ntype.build_multi_function = blender::nodes::node_math_build_multi_function;
+  ntype.gather_link_search_ops = file_ns::sh_node_math_gather_link_searches;
+  ntype.materialx_fn = file_ns::node_shader_materialx;
+  ntype.eval_elem = file_ns::node_eval_elem;
+  ntype.eval_inverse_elem = file_ns::node_eval_inverse_elem;
+  ntype.eval_inverse = file_ns::node_eval_inverse;
+
+  blender::bke::node_register_type(&ntype);
 }

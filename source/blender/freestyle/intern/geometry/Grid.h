@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __GRID_H__
-#define __GRID_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -35,9 +22,7 @@
 
 #include "BLI_utildefines.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
@@ -59,9 +44,7 @@ class Cell {
     _orig = orig;
   }
 
-  virtual ~Cell()
-  {
-  }
+  virtual ~Cell() {}
 
   inline void addOccluder(Polygon3r *o)
   {
@@ -84,43 +67,31 @@ class Cell {
   Vec3r _orig;
   OccludersSet _occluders;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Cell")
-#endif
 };
 
 class GridVisitor {
  public:
   virtual ~GridVisitor(){};  // soc
 
-  virtual void discoverCell(Cell * /*cell*/)
-  {
-  }
+  virtual void discoverCell(Cell * /*cell*/) {}
 
-  virtual void examineOccluder(Polygon3r * /*occ*/)
-  {
-  }
+  virtual void examineOccluder(Polygon3r * /*occ*/) {}
 
-  virtual void finishCell(Cell * /*cell*/)
-  {
-  }
+  virtual void finishCell(Cell * /*cell*/) {}
 
   virtual bool stop()
   {
     return false;
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:GridVisitor")
-#endif
 };
 
-/*! Gathers all the occluders belonging to the cells traversed by the ray */
+/** Gathers all the occluders belonging to the cells traversed by the ray */
 class allOccludersGridVisitor : public GridVisitor {
  public:
-  allOccludersGridVisitor(OccludersSet &occluders) : GridVisitor(), occluders_(occluders)
-  {
-  }
+  allOccludersGridVisitor(OccludersSet &occluders) : GridVisitor(), occluders_(occluders) {}
 
   virtual void examineOccluder(Polygon3r *occ);
 
@@ -138,7 +109,7 @@ class allOccludersGridVisitor : public GridVisitor {
   OccludersSet &occluders_;
 };
 
-/*! Finds the first intersection and breaks.
+/** Finds the first intersection and breaks.
  *  The occluder and the intersection information are stored and accessible.
  */
 class firstIntersectionGridVisitor : public GridVisitor {
@@ -165,9 +136,7 @@ class firstIntersectionGridVisitor : public GridVisitor {
   {
   }
 
-  virtual ~firstIntersectionGridVisitor()
-  {
-  }
+  virtual ~firstIntersectionGridVisitor() {}
 
   virtual void discoverCell(Cell *cell)
   {
@@ -191,22 +160,20 @@ class firstIntersectionGridVisitor : public GridVisitor {
 
 class Grid {
  public:
-  /*! Builds a Grid. Must be followed by a call to configure() */
-  Grid()
-  {
-  }
+  /** Builds a Grid. Must be followed by a call to configure() */
+  Grid() {}
 
   virtual ~Grid()
   {
     clear();
   }
 
-  /*! clears the grid
-   *  Deletes all the cells, clears the hashtable, resets size, size of cell, number of cells.
+  /** clears the grid
+   *  Deletes all the cells, clears the hash-table, resets size, size of cell, number of cells.
    */
   virtual void clear();
 
-  /*! Sets the different parameters of the grid
+  /** Sets the different parameters of the grid
    *    orig
    *      The grid origin
    *    size
@@ -214,9 +181,9 @@ class Grid {
    *    nb
    *      The number of cells of the grid
    */
-  virtual void configure(const Vec3r &orig, const Vec3r &size, unsigned nb);
+  virtual void configure(const Vec3r &orig, const Vec3r &size, uint nb);
 
-  /*! returns a vector of integer containing the coordinates of the cell containing the point
+  /** returns a vector of integer containing the coordinates of the cell containing the point
    * passed as argument
    *    p
    *      The point for which we're looking the cell
@@ -229,7 +196,7 @@ class Grid {
       if (tmp < 0) {
         res[i] = 0;
       }
-      else if ((unsigned int)tmp >= _cells_nb[i]) {
+      else if ((uint)tmp >= _cells_nb[i]) {
         res[i] = _cells_nb[i] - 1;
       }
       else {
@@ -238,14 +205,14 @@ class Grid {
     }
   }
 
-  /*! Fills the case corresponding to coord with the cell */
+  /** Fills the case corresponding to coord with the cell */
   virtual void fillCell(const Vec3u &coord, Cell &cell) = 0;
 
-  /*! returns the cell whose coordinates are passed as argument */
+  /** returns the cell whose coordinates are passed as argument */
   virtual Cell *getCell(const Vec3u &coord) = 0;
 
-  /*! returns the cell containing the point passed as argument.
-   *  If the cell is empty (contains no occluder),  NULL is returned:
+  /** returns the cell containing the point passed as argument.
+   *  If the cell is empty (contains no occluder), nullptr is returned:
    *    p
    *      The point for which we're looking the cell
    */
@@ -256,7 +223,7 @@ class Grid {
     return getCell(coord);
   }
 
-  /*! Retrieves the x,y,z coordinates of the origin of the cell whose coordinates (i,j,k)
+  /** Retrieves the x,y,z coordinates of the origin of the cell whose coordinates (i,j,k)
    *  is passed as argument:
    *    cell_coord
    *      i,j,k integer coordinates for the cell
@@ -265,12 +232,12 @@ class Grid {
    */
   inline void getCellOrigin(const Vec3u &cell_coord, Vec3r &orig)
   {
-    for (unsigned int i = 0; i < 3; i++) {
+    for (uint i = 0; i < 3; i++) {
       orig[i] = _orig[i] + cell_coord[i] * _cell_size[i];
     }
   }
 
-  /*! Retrieves the box corresponding to the cell whose coordinates are passed as argument:
+  /** Retrieves the box corresponding to the cell whose coordinates are passed as argument:
    *    cell_coord
    *      i,j,k integer coordinates for the cell
    *    min_out
@@ -284,55 +251,55 @@ class Grid {
     max_out = min_out + _cell_size;
   }
 
-  /*! inserts a convex polygon occluder
+  /** inserts a convex polygon occluder
    *  This method is quite coarse insofar as it adds all cells intersecting the polygon bounding
    * box convex_poly The list of 3D points constituting a convex polygon
    */
-  void insertOccluder(Polygon3r *convex_poly);
+  void insertOccluder(Polygon3r *occluder);
 
-  /*! Adds an occluder to the list of occluders */
+  /** Adds an occluder to the list of occluders */
   void addOccluder(Polygon3r *occluder)
   {
     _occluders.push_back(occluder);
   }
 
-  /*! Casts a ray between a starting point and an ending point
+  /** Casts a ray between a starting point and an ending point
    *  Returns the list of occluders contained in the cells intersected by this ray
    *  Starts with a call to InitRay.
    */
-  void castRay(const Vec3r &orig, const Vec3r &end, OccludersSet &occluders, unsigned timestamp);
+  void castRay(const Vec3r &orig, const Vec3r &end, OccludersSet &occluders, uint timestamp);
 
   // Prepares to cast ray without generating OccludersSet
-  void initAcceleratedRay(const Vec3r &orig, const Vec3r &end, unsigned timestamp);
+  void initAcceleratedRay(const Vec3r &orig, const Vec3r &end, uint timestamp);
 
-  /*! Casts an infinite ray (still finishing at the end of the grid) from a starting point and in a
+  /** Casts an infinite ray (still finishing at the end of the grid) from a starting point and in a
    * given direction. Returns the list of occluders contained in the cells intersected by this ray
    *  Starts with a call to InitRay.
    */
   void castInfiniteRay(const Vec3r &orig,
                        const Vec3r &dir,
                        OccludersSet &occluders,
-                       unsigned timestamp);
+                       uint timestamp);
 
   // Prepares to cast ray without generating OccludersSet.
-  bool initAcceleratedInfiniteRay(const Vec3r &orig, const Vec3r &dir, unsigned timestamp);
+  bool initAcceleratedInfiniteRay(const Vec3r &orig, const Vec3r &dir, uint timestamp);
 
-  /*! Casts an infinite ray (still finishing at the end of the grid) from a starting point and in a
+  /** Casts an infinite ray (still finishing at the end of the grid) from a starting point and in a
    * given direction. Returns the first intersection (occluder,t,u,v) or null. Starts with a call
    * to InitRay.
    */
   Polygon3r *castRayToFindFirstIntersection(
-      const Vec3r &orig, const Vec3r &dir, double &t, double &u, double &v, unsigned timestamp);
+      const Vec3r &orig, const Vec3r &dir, double &t, double &u, double &v, uint timestamp);
 
-  /*! Init all structures and values for computing the cells intersected by this new ray */
-  void initRay(const Vec3r &orig, const Vec3r &end, unsigned timestamp);
+  /** Init all structures and values for computing the cells intersected by this new ray */
+  void initRay(const Vec3r &orig, const Vec3r &end, uint timestamp);
 
-  /*! Init all structures and values for computing the cells intersected by this infinite ray.
+  /** Init all structures and values for computing the cells intersected by this infinite ray.
    * Returns false if the ray doesn't intersect the grid.
    */
-  bool initInfiniteRay(const Vec3r &orig, const Vec3r &dir, unsigned timestamp);
+  bool initInfiniteRay(const Vec3r &orig, const Vec3r &dir, uint timestamp);
 
-  /*! Accessors */
+  /** Accessors */
   inline const Vec3r &getOrigin() const
   {
     return _orig;
@@ -363,10 +330,10 @@ class Grid {
   }
 
  protected:
-  /*! Core of castRay and castInfiniteRay, find occluders along the given ray */
+  /** Core of castRay and castInfiniteRay, find occluders along the given ray */
   inline void castRayInternal(GridVisitor &visitor)
   {
-    Cell *current_cell = NULL;
+    Cell *current_cell = nullptr;
     do {
       current_cell = getCell(_current_cell);
       if (current_cell) {
@@ -384,10 +351,10 @@ class Grid {
     } while ((!visitor.stop()) && (nextRayCell(_current_cell, _current_cell)));
   }
 
-  /*! returns the  cell next to the cell passed as argument. */
+  /** Returns the cell next to the cell passed as argument. */
   bool nextRayCell(Vec3u &current_cell, Vec3u &next_cell);
 
-  unsigned int _timestamp;
+  uint _timestamp;
 
   Vec3u _cells_nb;   // number of cells for x,y,z axis
   Vec3r _cell_size;  // cell x,y,z dimensions
@@ -405,9 +372,7 @@ class Grid {
   // a ray
   OccludersSet _occluders;  // List of all occluders inserted in the grid
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Grid")
-#endif
 };
 
 //
@@ -427,11 +392,7 @@ class VirtualOccludersSet {
   Grid &grid;
   OccludersSet::iterator it, end;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:VirtualOccludersSet")
-#endif
 };
 
 } /* namespace Freestyle */
-
-#endif  // __GRID_H__

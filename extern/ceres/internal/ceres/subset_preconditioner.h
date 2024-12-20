@@ -32,6 +32,9 @@
 #define CERES_INTERNAL_SUBSET_PRECONDITIONER_H_
 
 #include <memory>
+
+#include "ceres/internal/disable_warnings.h"
+#include "ceres/internal/export.h"
 #include "ceres/preconditioner.h"
 
 namespace ceres {
@@ -65,11 +68,12 @@ class InnerProductComputer;
 // computationally expensive this preconditioner will be.
 //
 // See the tests for example usage.
-class SubsetPreconditioner : public BlockSparseMatrixPreconditioner {
+class CERES_NO_EXPORT SubsetPreconditioner
+    : public BlockSparseMatrixPreconditioner {
  public:
-  SubsetPreconditioner(const Preconditioner::Options& options,
+  SubsetPreconditioner(Preconditioner::Options options,
                        const BlockSparseMatrix& A);
-  virtual ~SubsetPreconditioner();
+  ~SubsetPreconditioner() override;
 
   // Preconditioner interface
   void RightMultiply(const double* x, double* y) const final;
@@ -87,5 +91,7 @@ class SubsetPreconditioner : public BlockSparseMatrixPreconditioner {
 
 }  // namespace internal
 }  // namespace ceres
+
+#include "ceres/internal/reenable_warnings.h"
 
 #endif  // CERES_INTERNAL_SUBSET_PRECONDITIONER_H_

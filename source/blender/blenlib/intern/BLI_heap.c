@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -26,8 +14,9 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_heap.h"
-#include "BLI_strict_flags.h"
 #include "BLI_utildefines.h"
+
+#include "BLI_strict_flags.h" /* Keep last. */
 
 /***/
 
@@ -41,18 +30,18 @@ struct HeapNode_Chunk {
   struct HeapNode_Chunk *prev;
   uint size;
   uint bufsize;
-  struct HeapNode buf[0];
+  HeapNode buf[0];
 };
 
 /**
  * Number of nodes to include per #HeapNode_Chunk when no reserved size is passed,
  * or we allocate past the reserved number.
  *
- * \note Optimize number for 64kb allocs.
- * \note keep type in sync with tot_nodes in heap_node_alloc_chunk.
+ * \note Optimize number for 64kb allocations.
+ * \note keep type in sync with nodes_num in heap_node_alloc_chunk.
  */
 #define HEAP_CHUNK_DEFAULT_NUM \
-  ((uint)((MEM_SIZE_OPTIMAL((1 << 16) - sizeof(struct HeapNode_Chunk))) / sizeof(HeapNode)))
+  (uint)(MEM_SIZE_OPTIMAL((1 << 16) - sizeof(struct HeapNode_Chunk)) / sizeof(HeapNode))
 
 struct Heap {
   uint size;
@@ -67,6 +56,7 @@ struct Heap {
   } nodes;
 };
 
+/* -------------------------------------------------------------------- */
 /** \name Internal Functions
  * \{ */
 
@@ -81,25 +71,12 @@ struct Heap {
 
 BLI_INLINE void heap_swap(Heap *heap, const uint i, const uint j)
 {
-#if 1
   HeapNode **tree = heap->tree;
   HeapNode *pi = tree[i], *pj = tree[j];
   pi->index = j;
   tree[j] = pi;
   pj->index = i;
   tree[i] = pj;
-#elif 0
-  SWAP(uint, heap->tree[i]->index, heap->tree[j]->index);
-  SWAP(HeapNode *, heap->tree[i], heap->tree[j]);
-#else
-  HeapNode **tree = heap->tree;
-  union {
-    uint index;
-    HeapNode *node;
-  } tmp;
-  SWAP_TVAL(tmp.index, tree[i]->index, tree[j]->index);
-  SWAP_TVAL(tmp.node, tree[i], tree[j]);
-#endif
 }
 
 static void heap_down(Heap *heap, uint i)
@@ -146,21 +123,22 @@ static void heap_up(Heap *heap, uint i)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
 /** \name Internal Memory Management
  * \{ */
 
-static struct HeapNode_Chunk *heap_node_alloc_chunk(uint tot_nodes,
+static struct HeapNode_Chunk *heap_node_alloc_chunk(uint nodes_num,
                                                     struct HeapNode_Chunk *chunk_prev)
 {
   struct HeapNode_Chunk *chunk = MEM_mallocN(
-      sizeof(struct HeapNode_Chunk) + (sizeof(HeapNode) * tot_nodes), __func__);
+      sizeof(struct HeapNode_Chunk) + (sizeof(HeapNode) * nodes_num), __func__);
   chunk->prev = chunk_prev;
-  chunk->bufsize = tot_nodes;
+  chunk->bufsize = nodes_num;
   chunk->size = 0;
   return chunk;
 }
 
-static struct HeapNode *heap_node_alloc(Heap *heap)
+static HeapNode *heap_node_alloc(Heap *heap)
 {
   HeapNode *node;
 
@@ -187,24 +165,20 @@ static void heap_node_free(Heap *heap, HeapNode *node)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
 /** \name Public Heap API
  * \{ */
 
-/**
- * Creates a new heap. Removed nodes are recycled, so memory usage will not shrink.
- *
- * \note Use when the size of the heap is known in advance.
- */
-Heap *BLI_heap_new_ex(uint tot_reserve)
+Heap *BLI_heap_new_ex(uint reserve_num)
 {
   Heap *heap = MEM_mallocN(sizeof(Heap), __func__);
   /* ensure we have at least one so we can keep doubling it */
   heap->size = 0;
-  heap->bufsize = MAX2(1u, tot_reserve);
+  heap->bufsize = MAX2(1u, reserve_num);
   heap->tree = MEM_mallocN(heap->bufsize * sizeof(HeapNode *), "BLIHeapTree");
 
   heap->nodes.chunk = heap_node_alloc_chunk(
-      (tot_reserve > 1) ? tot_reserve : HEAP_CHUNK_DEFAULT_NUM, NULL);
+      (reserve_num > 1) ? reserve_num : HEAP_CHUNK_DEFAULT_NUM, NULL);
   heap->nodes.free = NULL;
 
   return heap;
@@ -258,10 +232,6 @@ void BLI_heap_clear(Heap *heap, HeapFreeFP ptrfreefp)
   heap->nodes.free = NULL;
 }
 
-/**
- * Insert heap node with a value (often a 'cost') and pointer into the heap,
- * duplicate values are allowed.
- */
 HeapNode *BLI_heap_insert(Heap *heap, float value, void *ptr)
 {
   HeapNode *node;
@@ -286,9 +256,6 @@ HeapNode *BLI_heap_insert(Heap *heap, float value, void *ptr)
   return node;
 }
 
-/**
- * Convenience function since this is a common pattern.
- */
 void BLI_heap_insert_or_update(Heap *heap, HeapNode **node_p, float value, void *ptr)
 {
   if (*node_p == NULL) {
@@ -309,19 +276,11 @@ uint BLI_heap_len(const Heap *heap)
   return heap->size;
 }
 
-/**
- * Return the top node of the heap.
- * This is the node with the lowest value.
- */
 HeapNode *BLI_heap_top(const Heap *heap)
 {
   return heap->tree[0];
 }
 
-/**
- * Return the value of top node of the heap.
- * This is the node with the lowest value.
- */
 float BLI_heap_top_value(const Heap *heap)
 {
   BLI_assert(heap->size != 0);
@@ -329,9 +288,6 @@ float BLI_heap_top_value(const Heap *heap)
   return heap->tree[0]->value;
 }
 
-/**
- * Pop the top node off the heap and return it's pointer.
- */
 void *BLI_heap_pop_min(Heap *heap)
 {
   BLI_assert(heap->size != 0);
@@ -363,11 +319,6 @@ void BLI_heap_remove(Heap *heap, HeapNode *node)
   BLI_heap_pop_min(heap);
 }
 
-/**
- * Can be used to avoid #BLI_heap_remove, #BLI_heap_insert calls,
- * balancing the tree still has a performance cost,
- * but is often much less than remove/insert, difference is most noticeable with large heaps.
- */
 void BLI_heap_node_value_update(Heap *heap, HeapNode *node, float value)
 {
   if (value < node->value) {
@@ -393,14 +344,14 @@ void BLI_heap_node_value_update_ptr(Heap *heap, HeapNode *node, float value, voi
   }
 }
 
-float BLI_heap_node_value(const HeapNode *node)
+float BLI_heap_node_value(const HeapNode *heap)
 {
-  return node->value;
+  return heap->value;
 }
 
-void *BLI_heap_node_ptr(const HeapNode *node)
+void *BLI_heap_node_ptr(const HeapNode *heap)
 {
-  return node->ptr;
+  return heap->ptr;
 }
 
 static bool heap_is_minheap(const Heap *heap, uint root)
@@ -424,9 +375,6 @@ static bool heap_is_minheap(const Heap *heap, uint root)
   }
   return true;
 }
-/**
- * Only for checking internal errors (gtest).
- */
 bool BLI_heap_is_valid(const Heap *heap)
 {
   return heap_is_minheap(heap, 0);

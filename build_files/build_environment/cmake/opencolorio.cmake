@@ -1,112 +1,146 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2017-2022 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(OPENCOLORIO_EXTRA_ARGS
   -DOCIO_BUILD_APPS=OFF
-  -DOCIO_BUILD_PYGLUE=OFF
+  -DOCIO_BUILD_PYTHON=ON
   -DOCIO_BUILD_NUKE=OFF
-  -DOCIO_USE_BOOST_PTR=OFF
-  -DOCIO_BUILD_STATIC=ON
-  -DOCIO_BUILD_SHARED=OFF
-  -DOCIO_BUILD_TRUELIGHT=OFF
+  -DOCIO_BUILD_JAVA=OFF
+  -DBUILD_SHARED_LIBS=ON
   -DOCIO_BUILD_DOCS=OFF
-  -DOCIO_BUILD_PYGLUE=OFF
-  -DOCIO_BUILD_JNIGLUE=OFF
-  -DOCIO_STATIC_JNIGLUE=OFF
+  -DOCIO_BUILD_TESTS=OFF
+  -DOCIO_BUILD_GPU_TESTS=OFF
+  -DOCIO_USE_SIMD=ON
+
+  -DOCIO_INSTALL_EXT_PACKAGES=NONE
+
+  -Dexpat_ROOT=${LIBDIR}/expat
+  -Dyaml-cpp_ROOT=${LIBDIR}/yamlcpp
+  -Dyaml-cpp_VERSION=${YAMLCPP_VERSION}
+  -Dpystring_ROOT=${LIBDIR}/pystring
+  -DImath_ROOT=${LIBDIR}/imath
+  -Dminizip-ng_ROOT=${LIBDIR}/minizipng
+  -Dminizip-ng_INCLUDE_DIR=${LIBDIR}/minizipng/include/minizip-ng
+  -Dminizip-ng_LIBRARY=${LIBDIR}/minizipng/lib/libminizip${LIBEXT}
+  -DZLIB_LIBRARY=${LIBDIR}/zlib/lib/${ZLIB_LIBRARY}
+  -DZLIB_INCLUDE_DIR=${LIBDIR}/zlib/include/
+  -DPython_EXECUTABLE=${PYTHON_BINARY}
+  -Dpybind11_ROOT=${LIBDIR}/pybind11
 )
 
-if(WIN32)
-  set(OCIO_PATCH opencolorio_win.diff)
+if(APPLE)
+  # Work around issue where minizip-ng_LIBRARY assumes -ng in file name.
   set(OPENCOLORIO_EXTRA_ARGS
     ${OPENCOLORIO_EXTRA_ARGS}
-    -DOCIO_BUILD_TESTS=OFF
-    -DOCIO_USE_SSE=ON
-    -DOCIO_INLINES_HIDDEN=OFF
-    -DOCIO_PYGLUE_LINK=OFF
-    -DOCIO_PYGLUE_RESPECT_ABI=OFF
-    -DOCIO_PYGLUE_SONAME=OFF
-    -DOCIO_PYGLUE_LIB_PREFIX=OFF
-    -DUSE_EXTERNAL_TINYXML=ON
-    -DTINYXML_INCLUDE_DIR=${LIBDIR}/tinyxml/include
-    -DTINYXML_LIBRARY=${LIBDIR}/tinyxml/lib/tinyxml${libext}
-    -DUSE_EXTERNAL_YAML=ON
-    -DYAML_CPP_FOUND=ON
-    -DYAML_CPP_VERSION=${YAMLCPP_VERSION}
-    -DUSE_EXTERNAL_LCMS=ON
-    -DINC_1=${LIBDIR}/tinyxml/include
-    -DINC_2=${LIBDIR}/yamlcpp/include
-    # Lie because ocio cmake is demanding boost even though it is not needed.
-    -DYAML_CPP_VERSION=0.5.0
+    -Dminizip_LIBRARY=${LIBDIR}/minizipng/lib/libminizip${LIBEXT}
+  )
+endif()
+
+if(BLENDER_PLATFORM_ARM)
+  set(OPENCOLORIO_EXTRA_ARGS
+    ${OPENCOLORIO_EXTRA_ARGS}
+    -DOCIO_USE_SSE=OFF
+  )
+endif()
+
+if(WIN32)
+  set(OPENCOLORIO_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIMATH_DLL")
+  if(BUILD_MODE STREQUAL Debug)
+    set(OPENCOLORIO_CXX_FLAGS "${OPENCOLORIO_CXX_FLAGS} -DPy_DEBUG")
+  endif()
+  set(OPENCOLORIO_EXTRA_ARGS
+    ${OPENCOLORIO_EXTRA_ARGS}
+    -DCMAKE_DEBUG_POSTFIX=_d
+    -Dexpat_LIBRARY=${LIBDIR}/expat/lib/libexpat$<$<STREQUAL:${BUILD_MODE},Debug>:d>MD${LIBEXT}
+    -DImath_LIBRARY=${LIBDIR}/imath/lib/imath${OPENEXR_VERSION_POSTFIX}${LIBEXT}
+    -DCMAKE_CXX_FLAGS=${OPENCOLORIO_CXX_FLAGS}
   )
 else()
-  set(OCIO_PATCH opencolorio.diff)
   set(OPENCOLORIO_EXTRA_ARGS
     ${OPENCOLORIO_EXTRA_ARGS}
   )
 endif()
 
 ExternalProject_Add(external_opencolorio
-  URL ${OPENCOLORIO_URI}
+  URL file://${PACKAGE_DIR}/${OPENCOLORIO_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
-  URL_HASH MD5=${OPENCOLORIO_HASH}
+  URL_HASH ${OPENCOLORIO_HASH_TYPE}=${OPENCOLORIO_HASH}
+  CMAKE_GENERATOR ${PLATFORM_ALT_GENERATOR}
   PREFIX ${BUILD_DIR}/opencolorio
-  PATCH_COMMAND ${PATCH_CMD} -p 1 -N -d ${BUILD_DIR}/opencolorio/src/external_opencolorio < ${PATCH_DIR}/${OCIO_PATCH}
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${LIBDIR}/opencolorio ${DEFAULT_CMAKE_FLAGS} ${OPENCOLORIO_EXTRA_ARGS}
+
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${LIBDIR}/opencolorio
+    ${DEFAULT_CMAKE_FLAGS}
+    ${OPENCOLORIO_EXTRA_ARGS}
+
   INSTALL_DIR ${LIBDIR}/opencolorio
 )
 
-if(NOT WIN32)
-  add_custom_command(
-    OUTPUT ${LIBDIR}/opencolorio/lib/libtinyxml.a
-    COMMAND cp ${BUILD_DIR}/opencolorio/src/external_opencolorio-build/ext/dist/lib/libtinyxml.a ${LIBDIR}/opencolorio/lib/libtinyxml.a
-    COMMAND cp ${BUILD_DIR}/opencolorio/src/external_opencolorio-build/ext/dist/lib/libyaml-cpp.a ${LIBDIR}/opencolorio/lib/libyaml-cpp.a
-  )
-  add_custom_target(external_opencolorio_extra ALL DEPENDS external_opencolorio ${LIBDIR}/opencolorio/lib/libtinyxml.a)
-endif()
-
 add_dependencies(
   external_opencolorio
-  external_boost
+  external_yamlcpp
+  external_expat
+  external_imath
+  external_pystring
+  external_zlib
+  external_minizipng
+  external_python
+  external_pybind11
 )
 
 if(WIN32)
-  add_dependencies(
-    external_opencolorio
-    external_tinyxml
-    external_yamlcpp
-
-  )
   if(BUILD_MODE STREQUAL Release)
     ExternalProject_Add_Step(external_opencolorio after_install
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/opencolorio/include ${HARVEST_TARGET}/opencolorio/include
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/opencolorio/lib/static ${HARVEST_TARGET}/opencolorio/lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/yamlcpp/lib/libyaml-cppmd.lib ${HARVEST_TARGET}/opencolorio/lib/libyaml-cpp.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/tinyxml/lib/tinyxml.lib ${HARVEST_TARGET}/opencolorio/lib/tinyxml.lib
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${LIBDIR}/opencolorio/include
+        ${HARVEST_TARGET}/opencolorio/include
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/opencolorio/bin/OpenColorIO_2_3.dll
+        ${HARVEST_TARGET}/opencolorio/bin/OpenColorIO_2_3.dll
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${LIBDIR}/opencolorio/lib
+        ${HARVEST_TARGET}/opencolorio/lib
+
       DEPENDEES install
     )
   endif()
   if(BUILD_MODE STREQUAL Debug)
     ExternalProject_Add_Step(external_opencolorio after_install
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/opencolorio/lib/static/Opencolorio.lib ${HARVEST_TARGET}/opencolorio/lib/OpencolorIO_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/yamlcpp/lib/libyaml-cppmdd.lib ${HARVEST_TARGET}/opencolorio/lib/libyaml-cpp_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/tinyxml/lib/tinyxml.lib ${HARVEST_TARGET}/opencolorio/lib/tinyxml_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/opencolorio/bin/OpenColorIO_d_2_3.dll
+        ${HARVEST_TARGET}/opencolorio/bin/OpenColorIO_d_2_3.dll
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/opencolorio/lib/Opencolorio_d.lib
+        ${HARVEST_TARGET}/opencolorio/lib/OpenColorIO_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${LIBDIR}/opencolorio/lib/site-packages
+        ${HARVEST_TARGET}/opencolorio/lib/site-packages-debug
+
       DEPENDEES install
     )
   endif()
+else()
+  ExternalProject_Add_Step(external_opencolorio after_install
+    COMMAND cp
+      ${LIBDIR}/yamlcpp/lib/libyaml-cpp.a
+      ${LIBDIR}/opencolorio/lib/
+    COMMAND cp
+      ${LIBDIR}/expat/lib/libexpat.a
+      ${LIBDIR}/opencolorio/lib/
+    COMMAND cp
+      ${LIBDIR}/pystring/lib/libpystring.a
+      ${LIBDIR}/opencolorio/lib/
 
+    DEPENDEES install
+  )
+
+  harvest(external_opencolorio opencolorio/include opencolorio/include "*.h")
+  harvest_rpath_lib(external_opencolorio opencolorio/lib opencolorio/lib "*${SHAREDLIBEXT}*")
+  harvest_rpath_python(
+    external_opencolorio
+    opencolorio/lib/python${PYTHON_SHORT_VERSION}
+    python/lib/python${PYTHON_SHORT_VERSION}
+    "*"
+  )
 endif()

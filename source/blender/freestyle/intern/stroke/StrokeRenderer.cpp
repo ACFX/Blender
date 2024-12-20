@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -22,6 +10,8 @@
 #include "StrokeRenderer.h"
 
 #include "../geometry/GeomUtils.h"
+
+#include "BLI_sys_types.h"
 
 using namespace std;
 
@@ -35,15 +25,9 @@ namespace Freestyle {
 /*                                */
 /**********************************/
 
-TextureManager *StrokeRenderer::_textureManager = 0;
+TextureManager *StrokeRenderer::_textureManager = nullptr;
 
-StrokeRenderer::StrokeRenderer()
-{
-}
-
-StrokeRenderer::~StrokeRenderer()
-{
-}
+StrokeRenderer::~StrokeRenderer() = default;
 
 bool StrokeRenderer::loadTextures()
 {
@@ -59,7 +43,7 @@ bool StrokeRenderer::loadTextures()
 /*                                */
 /**********************************/
 
-TextureManager *TextureManager::_pInstance = 0;
+TextureManager *TextureManager::_pInstance = nullptr;
 
 string TextureManager::_patterns_path;
 
@@ -77,7 +61,7 @@ TextureManager::~TextureManager()
   if (!_brushesMap.empty()) {
     _brushesMap.clear();
   }
-  _pInstance = 0;
+  _pInstance = nullptr;
 }
 
 void TextureManager::load()
@@ -89,21 +73,20 @@ void TextureManager::load()
   _hasLoadedTextures = true;
 }
 
-unsigned TextureManager::getBrushTextureIndex(string name, Stroke::MediumType loadingMode)
+uint TextureManager::getBrushTextureIndex(string name, Stroke::MediumType iType)
 {
-  BrushTexture bt(name, loadingMode);
+  BrushTexture bt(name, iType);
   brushesMap::iterator b = _brushesMap.find(bt);
   if (b == _brushesMap.end()) {
-    unsigned texId = loadBrush(name, loadingMode);
+    uint texId = loadBrush(name, iType);
     _brushesMap[bt] = texId;
     return texId;
     // XXX!
     cerr << "brush file " << name << " not found" << endl;
     return 0;
   }
-  else {
-    return _brushesMap[bt];
-  }
+
+  return _brushesMap[bt];
 }
 
 void TextureManager::Options::setPatternsPath(const string &path)

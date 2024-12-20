@@ -1,39 +1,33 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
  * \ingroup balembic
  */
 
-#include <Alembic/Abc/All.h>
-#include <Alembic/AbcGeom/All.h>
+#include <Alembic/Abc/IObject.h>
+#include <Alembic/Abc/ISampleSelector.h>
+#include <Alembic/AbcCoreAbstract/Foundation.h>
+#include <Alembic/AbcCoreAbstract/ObjectHeader.h>
+#include <Alembic/AbcGeom/IXform.h>
 
-#include "DNA_ID.h"
+#include <string>
+#include <vector>
 
 struct CacheFile;
 struct Main;
 struct Mesh;
 struct Object;
 
+namespace blender::bke {
+struct GeometrySet;
+}
+
 using Alembic::AbcCoreAbstract::chrono_t;
 
-namespace blender {
-namespace io {
-namespace alembic {
+namespace blender::io::alembic {
 
 struct ImportSettings {
   bool do_convert_mat;
@@ -45,14 +39,19 @@ struct ImportSettings {
   bool is_sequence;
   bool set_frame_range;
 
-  /* Length and frame offset of file sequences. */
-  int sequence_len;
-  int sequence_offset;
+  /* Min and max frame detected from  file sequences. */
+  int sequence_min_frame;
+  int sequence_max_frame;
 
   /* From MeshSeqCacheModifierData.read_flag */
   int read_flag;
 
+  /* From CacheFile and MeshSeqCacheModifierData */
+  std::string velocity_name;
+  float velocity_scale;
+
   bool validate_meshes;
+  bool always_add_cache_reader;
 
   CacheFile *cache_file;
 
@@ -63,10 +62,13 @@ struct ImportSettings {
         scale(1.0f),
         is_sequence(false),
         set_frame_range(false),
-        sequence_len(1),
-        sequence_offset(0),
+        sequence_min_frame(0),
+        sequence_max_frame(1),
         read_flag(0),
+        velocity_name(""),
+        velocity_scale(1.0f),
         validate_meshes(false),
+        always_add_cache_reader(false),
         cache_file(NULL)
   {
   }
@@ -85,7 +87,11 @@ class AbcObjectReader {
   Object *m_object;
   Alembic::Abc::IObject m_iobject;
 
+  /* XXX - TODO(kevindietrich) : this references stack memory... */
   ImportSettings *m_settings;
+  /* This is initialized from the ImportSettings above on construction. It will need to be removed
+   * once we fix the stack memory reference situation. */
+  bool m_is_reading_a_file_sequence = false;
 
   chrono_t m_min_time;
   chrono_t m_max_time;
@@ -102,7 +108,7 @@ class AbcObjectReader {
  public:
   explicit AbcObjectReader(const Alembic::Abc::IObject &object, ImportSettings &settings);
 
-  virtual ~AbcObjectReader();
+  virtual ~AbcObjectReader() = default;
 
   const Alembic::Abc::IObject &iobject() const;
 
@@ -137,19 +143,22 @@ class AbcObjectReader {
   virtual bool valid() const = 0;
   virtual bool accepts_object_type(const Alembic::AbcCoreAbstract::ObjectHeader &alembic_header,
                                    const Object *const ob,
-                                   const char **err_str) const = 0;
+                                   const char **r_err_str) const = 0;
 
   virtual void readObjectData(Main *bmain, const Alembic::Abc::ISampleSelector &sample_sel) = 0;
 
-  virtual struct Mesh *read_mesh(struct Mesh *mesh,
-                                 const Alembic::Abc::ISampleSelector &sample_sel,
-                                 int read_flag,
-                                 const char **err_str);
-  virtual bool topology_changed(Mesh *existing_mesh,
+  virtual void read_geometry(bke::GeometrySet &geometry_set,
+                             const Alembic::Abc::ISampleSelector &sample_sel,
+                             int read_flag,
+                             const char *velocity_name,
+                             float velocity_scale,
+                             const char **r_err_str);
+
+  virtual bool topology_changed(const Mesh *existing_mesh,
                                 const Alembic::Abc::ISampleSelector &sample_sel);
 
   /** Reads the object matrix and sets up an object transform if animated. */
-  void setupObjectTransform(const float time);
+  void setupObjectTransform(chrono_t time);
 
   void addCacheModifier();
 
@@ -160,14 +169,13 @@ class AbcObjectReader {
   void incref();
   void decref();
 
-  void read_matrix(float r_mat[4][4], const float time, const float scale, bool &is_constant);
+  void read_matrix(float r_mat[4][4], chrono_t time, float scale, bool &is_constant);
 
  protected:
+  /** Determine whether we can inherit our parent's XForm. */
   void determine_inherits_xform();
 };
 
-Imath::M44d get_matrix(const Alembic::AbcGeom::IXformSchema &schema, const float time);
+Imath::M44d get_matrix(const Alembic::AbcGeom::IXformSchema &schema, chrono_t time);
 
-}  // namespace alembic
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::alembic

@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __APPVIEW_H__
-#define __APPVIEW_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -28,11 +15,9 @@
 #include "../scene_graph/NodeDrawingStyle.h"
 #include "../system/Precision.h"
 
-#include "BLI_math.h"
+#include "BLI_math_base.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -45,11 +30,11 @@ class AppView {
 
  public:
   // inherited
-  inline unsigned int width()
+  inline uint width()
   {
     return _width;
   }
-  inline unsigned int height()
+  inline uint height()
   {
     return _height;
   }
@@ -61,11 +46,11 @@ class AppView {
   {
     return _thickness;
   }
-  inline void setWidth(unsigned int width)
+  inline void setWidth(uint width)
   {
     _width = width;
   }
-  inline void setHeight(unsigned int height)
+  inline void setHeight(uint height)
   {
     _height = height;
   }
@@ -79,12 +64,12 @@ class AppView {
   }
 
  protected:
-  unsigned int _width, _height;
+  uint _width, _height;
   BBox<Vec2i> _border;
   float _thickness;
 
  public:
-  /*! Sets the model to draw in the viewer
+  /** Sets the model to draw in the viewer
    *  iModel
    *    The Root Node of the model
    */
@@ -98,7 +83,7 @@ class AppView {
     AddModel(iModel);
   }
 
-  /*! Adds a model for displaying in the viewer */
+  /** Adds a model for displaying in the viewer */
   inline void AddModel(NodeGroup *iModel)
   {
     _ModelRootNode->AddChild(iModel);
@@ -215,7 +200,7 @@ class AppView {
 
   inline real GetFovyDegrees() const
   {
-    return _Fovy * 180.0 / M_PI;  // TODO Use RAD2DEG here too?
+    return _Fovy * 180.0 / M_PI; /* TODO: Use RAD2DEG here too? */
   }
 
   BBox<Vec3r> scene3DBBox() const
@@ -227,14 +212,14 @@ class AppView {
   real zfar();
 
  public:
-  /*! Core scene drawing */
+  /** Core scene drawing */
   void DrawScene(SceneVisitor *iRenderer);
 
-  /*! 2D Scene Drawing */
+  /** 2D Scene Drawing */
   void Draw2DScene(SceneVisitor *iRenderer);
 
  protected:
-  /*! fabs or abs */
+  /** fabs or abs */
   inline int rabs(int x)
   {
     return abs(x);
@@ -266,11 +251,7 @@ class AppView {
   NodeGroup _p2DNode;
   NodeDrawingStyle *_p2DSelectionNode;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:AppView")
-#endif
 };
 
 } /* namespace Freestyle */
-
-#endif  // __APPVIEW_H__

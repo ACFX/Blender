@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_VIEW_EDGE_X_BUILDER_H__
-#define __FREESTYLE_VIEW_EDGE_X_BUILDER_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -42,9 +29,7 @@
 
 #include "../system/FreestyleConfig.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
@@ -54,15 +39,15 @@ using namespace Geometry;
 
 class SVertex;
 
-/*! Defines a hash table used for searching the SVertex */
+/** Defines a hash table used for searching the SVertex */
 struct SVertexHasher {
 #define _MUL 950706376UL
 #define _MOD 2147483647UL
   inline size_t operator()(const Vec3r &p) const
   {
-    size_t res = ((unsigned long)(p[0] * _MUL)) % _MOD;
-    res = ((res + (unsigned long)(p[1]) * _MUL)) % _MOD;
-    return ((res + (unsigned long)(p[2]) * _MUL)) % _MOD;
+    size_t res = (ulong(p[0] * _MUL)) % _MOD;
+    res = ((res + ulong(p[1]) * _MUL)) % _MOD;
+    return ((res + ulong(p[2]) * _MUL)) % _MOD;
   }
 #undef _MUL
 #undef _MOD
@@ -82,7 +67,7 @@ typedef map<Vec3r, SVertex *> SVertexMap;
 
 class WXFaceLayer;
 
-/*! class to describe an oriented smooth edge */
+/** class to describe an oriented smooth edge */
 class OWXFaceLayer {
  public:
   WXFaceLayer *fl;
@@ -90,7 +75,7 @@ class OWXFaceLayer {
 
   OWXFaceLayer()
   {
-    fl = NULL;
+    fl = nullptr;
     order = true;
   }
 
@@ -117,14 +102,12 @@ class OWXFaceLayer {
     return !(*this == b);
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:OWXFaceLayer")
-#endif
 };
 
 class WXEdge;
 
-/*! class to describe an oriented sharp edge */
+/** class to describe an oriented sharp edge */
 class OWXEdge {
  public:
   WXEdge *e;
@@ -132,7 +115,7 @@ class OWXEdge {
 
   OWXEdge()
   {
-    e = NULL;
+    e = nullptr;
     order = true;
   }
 
@@ -159,9 +142,7 @@ class OWXEdge {
     return !(*this == b);
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:OWXEdge")
-#endif
 };
 
 class WOEdge;
@@ -187,11 +168,9 @@ class ViewEdgeXBuilder {
     _currentSVertexId = 0;
   }
 
-  virtual ~ViewEdgeXBuilder()
-  {
-  }
+  virtual ~ViewEdgeXBuilder() {}
 
-  /*! Builds a view shape from a WXShape in which the feature edges are flagged
+  /** Builds a view shape from a WXShape in which the feature edges are flagged
    *  Builds chains of feature edges (so ViewEdges) from a WXShape
    *    iWShape
    *      The Winged Edge structure in which all silhouette edges and vertices are flagged.
@@ -213,14 +192,14 @@ class ViewEdgeXBuilder {
                               std::vector<FEdge *> &ioFEdges,
                               std::vector<SVertex *> &ioSVertices);
 
-  /*! Builds a smooth view edge, starting the face iFace. */
+  /** Builds a smooth view edge, starting the face iFace. */
   ViewEdge *BuildSmoothViewEdge(const OWXFaceLayer &iFaceLayer);
 
-  /*! Makes a sharp viewedge  */
+  /** Makes a sharp viewedge. */
   ViewEdge *BuildSharpViewEdge(const OWXEdge &iWEdge);
 
  public:
-  /*! accessors */
+  /** accessors */
   inline int currentViewId() const
   {
     return _currentViewId;
@@ -236,7 +215,7 @@ class ViewEdgeXBuilder {
     return _currentSVertexId;
   }
 
-  /*! modifiers */
+  /** modifiers */
   inline void setCurrentViewId(int id)
   {
     _currentViewId = id;
@@ -253,30 +232,30 @@ class ViewEdgeXBuilder {
   }
 
  protected:
-  /*! Init the view edges building */
+  /** Init the view edges building */
   virtual void Init(ViewShape *oVShape);
 
   // SMOOTH //
-  /*! checks whether a face has already been processed or not */
+  /** checks whether a face has already been processed or not */
   bool stopSmoothViewEdge(WXFaceLayer *iFaceLayer);
   OWXFaceLayer FindNextFaceLayer(const OWXFaceLayer &iFaceLayer);
   OWXFaceLayer FindPreviousFaceLayer(const OWXFaceLayer &iFaceLayer);
   FEdge *BuildSmoothFEdge(FEdge *feprevious, const OWXFaceLayer &ifl);
 
   // SHARP //
-  /*! checks whether a WEdge has already been processed or not */
-  bool stopSharpViewEdge(WXEdge *iFace);
+  /** checks whether a WEdge has already been processed or not */
+  bool stopSharpViewEdge(WXEdge *iEdge);
   int retrieveFaceMarks(WXEdge *iEdge);
   OWXEdge FindNextWEdge(const OWXEdge &iEdge);
   OWXEdge FindPreviousWEdge(const OWXEdge &iEdge);
   FEdge *BuildSharpFEdge(FEdge *feprevious, const OWXEdge &iwe);
 
   // GENERAL //
-  /*! Instantiate a SVertex */
+  /** Instantiate a SVertex */
   SVertex *MakeSVertex(Vec3r &iPoint);
-  /*! Instantiate a SVertex if it hasn't been already created */
+  /** Instantiate a SVertex if it hasn't been already created */
   SVertex *MakeSVertex(Vec3r &iPoint, bool shared);
-  /*! instantiate a ViewVertex from a SVertex, if it doesn't exist yet */
+  /** instantiate a ViewVertex from a SVertex, if it doesn't exist yet */
   ViewVertex *MakeViewVertex(SVertex *iSVertex);
 
   // oldtmp values
@@ -286,11 +265,7 @@ class ViewEdgeXBuilder {
   SShape *_pCurrentSShape;
   ViewShape *_pCurrentVShape;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewEdgeXBuilder")
-#endif
 };
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_VIEW_EDGE_X_BUILDER_H__

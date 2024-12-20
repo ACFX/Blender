@@ -35,6 +35,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+
 #include "ceres/stringprintf.h"
 #include "ceres/types.h"
 namespace ceres {
@@ -43,9 +44,9 @@ namespace internal {
 using std::string;
 
 bool IsArrayValid(const int size, const double* x) {
-  if (x != NULL) {
+  if (x != nullptr) {
     for (int i = 0; i < size; ++i) {
-      if (!std::isfinite(x[i]) || (x[i] == kImpossibleValue))  {
+      if (!std::isfinite(x[i]) || (x[i] == kImpossibleValue)) {
         return false;
       }
     }
@@ -54,12 +55,12 @@ bool IsArrayValid(const int size, const double* x) {
 }
 
 int FindInvalidValue(const int size, const double* x) {
-  if (x == NULL) {
+  if (x == nullptr) {
     return size;
   }
 
   for (int i = 0; i < size; ++i) {
-    if (!std::isfinite(x[i]) || (x[i] == kImpossibleValue))  {
+    if (!std::isfinite(x[i]) || (x[i] == kImpossibleValue)) {
       return i;
     }
   }
@@ -68,7 +69,7 @@ int FindInvalidValue(const int size, const double* x) {
 }
 
 void InvalidateArray(const int size, double* x) {
-  if (x != NULL) {
+  if (x != nullptr) {
     for (int i = 0; i < size; ++i) {
       x[i] = kImpossibleValue;
     }
@@ -77,7 +78,7 @@ void InvalidateArray(const int size, double* x) {
 
 void AppendArrayToString(const int size, const double* x, string* result) {
   for (int i = 0; i < size; ++i) {
-    if (x == NULL) {
+    if (x == nullptr) {
       StringAppendF(result, "Not Computed  ");
     } else {
       if (x[i] == kImpossibleValue) {
@@ -92,14 +93,13 @@ void AppendArrayToString(const int size, const double* x, string* result) {
 void MapValuesToContiguousRange(const int size, int* array) {
   std::vector<int> unique_values(array, array + size);
   std::sort(unique_values.begin(), unique_values.end());
-  unique_values.erase(std::unique(unique_values.begin(),
-                                  unique_values.end()),
+  unique_values.erase(std::unique(unique_values.begin(), unique_values.end()),
                       unique_values.end());
 
   for (int i = 0; i < size; ++i) {
-    array[i] = std::lower_bound(unique_values.begin(),
-                                unique_values.end(),
-                                array[i]) - unique_values.begin();
+    array[i] =
+        std::lower_bound(unique_values.begin(), unique_values.end(), array[i]) -
+        unique_values.begin();
   }
 }
 

@@ -28,8 +28,9 @@
 //
 // Author: sameeragarwal@google.com (Sameer Agarwal)
 
-#include <string>
 #include "ceres/iterative_refiner.h"
+
+#include <string>
 
 #include "Eigen/Core"
 #include "ceres/sparse_cholesky.h"
@@ -41,7 +42,7 @@ namespace internal {
 IterativeRefiner::IterativeRefiner(const int max_num_iterations)
     : max_num_iterations_(max_num_iterations) {}
 
-IterativeRefiner::~IterativeRefiner() {}
+IterativeRefiner::~IterativeRefiner() = default;
 
 void IterativeRefiner::Allocate(int num_cols) {
   residual_.resize(num_cols);

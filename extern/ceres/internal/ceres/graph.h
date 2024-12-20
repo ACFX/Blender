@@ -32,9 +32,11 @@
 #define CERES_INTERNAL_GRAPH_H_
 
 #include <limits>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
+
+#include "ceres/internal/export.h"
 #include "ceres/map_util.h"
 #include "ceres/pair_hash.h"
 #include "ceres/types.h"
@@ -46,10 +48,8 @@ namespace internal {
 // A unweighted undirected graph templated over the vertex ids. Vertex
 // should be hashable.
 template <typename Vertex>
-class Graph {
+class CERES_NO_EXPORT Graph {
  public:
-  Graph() {}
-
   // Add a vertex.
   void AddVertex(const Vertex& vertex) {
     if (vertices_.insert(vertex).second) {
@@ -93,9 +93,7 @@ class Graph {
     return FindOrDie(edges_, vertex);
   }
 
-  const std::unordered_set<Vertex>& vertices() const {
-    return vertices_;
-  }
+  const std::unordered_set<Vertex>& vertices() const { return vertices_; }
 
  private:
   std::unordered_set<Vertex> vertices_;
@@ -107,8 +105,6 @@ class Graph {
 template <typename Vertex>
 class WeightedGraph {
  public:
-  WeightedGraph() {}
-
   // Add a weighted vertex. If the vertex already exists in the graph,
   // its weight is set to the new weight.
   void AddVertex(const Vertex& vertex, double weight) {
@@ -121,9 +117,7 @@ class WeightedGraph {
 
   // Uses weight = 1.0. If vertex already exists, its weight is set to
   // 1.0.
-  void AddVertex(const Vertex& vertex) {
-    AddVertex(vertex, 1.0);
-  }
+  void AddVertex(const Vertex& vertex) { AddVertex(vertex, 1.0); }
 
   bool RemoveVertex(const Vertex& vertex) {
     if (vertices_.find(vertex) == vertices_.end()) {
@@ -184,11 +178,11 @@ class WeightedGraph {
   // the edge weight is zero.
   double EdgeWeight(const Vertex& vertex1, const Vertex& vertex2) const {
     if (vertex1 < vertex2) {
-      return FindWithDefault(edge_weights_,
-                             std::make_pair(vertex1, vertex2), 0.0);
+      return FindWithDefault(
+          edge_weights_, std::make_pair(vertex1, vertex2), 0.0);
     } else {
-      return FindWithDefault(edge_weights_,
-                             std::make_pair(vertex2, vertex1), 0.0);
+      return FindWithDefault(
+          edge_weights_, std::make_pair(vertex2, vertex1), 0.0);
     }
   }
 
@@ -198,9 +192,7 @@ class WeightedGraph {
     return FindOrDie(edges_, vertex);
   }
 
-  const std::unordered_set<Vertex>& vertices() const {
-    return vertices_;
-  }
+  const std::unordered_set<Vertex>& vertices() const { return vertices_; }
 
   static double InvalidWeight() {
     return std::numeric_limits<double>::quiet_NaN();

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2015 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2015 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -30,15 +15,14 @@
 #include "BLI_stack.h"
 #include "BLI_utildefines.h"
 
-#include "intern/node/deg_node.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_operation.hh"
 
-#include "intern/depsgraph.h"
-#include "intern/depsgraph_relation.h"
+#include "intern/depsgraph.hh"
+#include "intern/depsgraph_relation.hh"
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 namespace {
 
@@ -59,9 +43,7 @@ struct StackEntry {
 
 struct CyclesSolverState {
   CyclesSolverState(Depsgraph *graph)
-      : graph(graph),
-        traversal_stack(BLI_stack_new(sizeof(StackEntry), "DEG detect cycles stack")),
-        num_cycles(0)
+      : graph(graph), traversal_stack(BLI_stack_new(sizeof(StackEntry), "DEG detect cycles stack"))
   {
     /* pass */
   }
@@ -74,12 +56,12 @@ struct CyclesSolverState {
   }
   Depsgraph *graph;
   BLI_Stack *traversal_stack;
-  int num_cycles;
+  int num_cycles = 0;
 };
 
 inline void set_node_visited_state(Node *node, eCyclicCheckVisitedState state)
 {
-  node->custom_flags = (node->custom_flags & ~0x3) | (int)state;
+  node->custom_flags = (node->custom_flags & ~0x3) | int(state);
 }
 
 inline eCyclicCheckVisitedState get_node_visited_state(Node *node)
@@ -235,5 +217,4 @@ void deg_graph_detect_cycles(Depsgraph *graph)
   }
 }
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

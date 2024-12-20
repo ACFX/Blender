@@ -36,14 +36,18 @@
 
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
+
 #include "ceres/block_sparse_matrix.h"
 #include "ceres/casts.h"
 #include "ceres/compressed_row_sparse_matrix.h"
 #include "ceres/context_impl.h"
 #include "ceres/dense_sparse_matrix.h"
 #include "ceres/execution_summary.h"
+#include "ceres/internal/disable_warnings.h"
+#include "ceres/internal/export.h"
 #include "ceres/triplet_sparse_matrix.h"
 #include "ceres/types.h"
 #include "glog/logging.h"
@@ -74,11 +78,11 @@ enum LinearSolverTerminationType {
 // algebra library should use before computing a sparse factorization
 // (usually Cholesky).
 enum OrderingType {
-  NATURAL, // Do not re-order the matrix. This is useful when the
-           // matrix has been ordered using a fill-reducing ordering
-           // already.
-  AMD      // Use the Approximate Minimum Degree algorithm to re-order
-           // the matrix.
+  NATURAL,  // Do not re-order the matrix. This is useful when the
+            // matrix has been ordered using a fill-reducing ordering
+            // already.
+  AMD       // Use the Approximate Minimum Degree algorithm to re-order
+            // the matrix.
 };
 
 class LinearOperator;
@@ -99,7 +103,7 @@ class LinearOperator;
 // The Options struct configures the LinearSolver object for its
 // lifetime. The PerSolveOptions struct is used to specify options for
 // a particular Solve call.
-class LinearSolver {
+class CERES_NO_EXPORT LinearSolver {
  public:
   struct Options {
     LinearSolverType type = SPARSE_NORMAL_CHOLESKY;
@@ -215,7 +219,6 @@ class LinearSolver {
     // used a preconditioner.
     LinearOperator* preconditioner = nullptr;
 
-
     // The following tolerance related options only makes sense for
     // iterative solvers. Direct solvers ignore them.
 
@@ -283,11 +286,11 @@ class LinearSolver {
   // issues. Further, this calls are not expected to be frequent or
   // performance sensitive.
   virtual std::map<std::string, CallStatistics> Statistics() const {
-    return std::map<std::string, CallStatistics>();
+    return {};
   }
 
   // Factory
-  static LinearSolver* Create(const Options& options);
+  static std::unique_ptr<LinearSolver> Create(const Options& options);
 };
 
 // This templated subclass of LinearSolver serves as a base class for
@@ -300,12 +303,11 @@ class LinearSolver {
 template <typename MatrixType>
 class TypedLinearSolver : public LinearSolver {
  public:
-  virtual ~TypedLinearSolver() {}
-  virtual LinearSolver::Summary Solve(
+  LinearSolver::Summary Solve(
       LinearOperator* A,
       const double* b,
       const LinearSolver::PerSolveOptions& per_solve_options,
-      double* x) {
+      double* x) override {
     ScopedExecutionTimer total_time("LinearSolver::Solve", &execution_summary_);
     CHECK(A != nullptr);
     CHECK(b != nullptr);
@@ -313,7 +315,7 @@ class TypedLinearSolver : public LinearSolver {
     return SolveImpl(down_cast<MatrixType*>(A), b, per_solve_options, x);
   }
 
-  virtual std::map<std::string, CallStatistics> Statistics() const {
+  std::map<std::string, CallStatistics> Statistics() const override {
     return execution_summary_.statistics();
   }
 
@@ -329,12 +331,16 @@ class TypedLinearSolver : public LinearSolver {
 
 // Linear solvers that depend on acccess to the low level structure of
 // a SparseMatrix.
+// clang-format off
 typedef TypedLinearSolver<BlockSparseMatrix>         BlockSparseMatrixSolver;          // NOLINT
 typedef TypedLinearSolver<CompressedRowSparseMatrix> CompressedRowSparseMatrixSolver;  // NOLINT
 typedef TypedLinearSolver<DenseSparseMatrix>         DenseSparseMatrixSolver;          // NOLINT
 typedef TypedLinearSolver<TripletSparseMatrix>       TripletSparseMatrixSolver;        // NOLINT
+// clang-format on
 
 }  // namespace internal
 }  // namespace ceres
+
+#include "ceres/internal/reenable_warnings.h"
 
 #endif  // CERES_INTERNAL_LINEAR_SOLVER_H_

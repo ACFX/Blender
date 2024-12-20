@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -20,17 +8,19 @@
  * \brief from "Graphics Gems", Academic Press, 1990
  */
 
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>  // for malloc and free
-#include <math.h>
-#include <stdio.h>
 
 #include "FitCurve.h"
+
+#include "BLI_sys_types.h"
 
 using namespace std;
 
 namespace Freestyle {
 
-typedef Vector2 *BezierCurve;
+using BezierCurve = Vector2 *;
 
 /* Forward declarations */
 static double *Reparameterize(Vector2 *d, int first, int last, double *u, BezierCurve bezCurve);
@@ -59,7 +49,7 @@ static double V2SquaredLength(Vector2 *a)
 /* returns length of input vector */
 static double V2Length(Vector2 *a)
 {
-  return (sqrt(V2SquaredLength(a)));
+  return sqrt(V2SquaredLength(a));
 }
 
 static Vector2 *V2Scale(Vector2 *v, double newlen)
@@ -83,7 +73,7 @@ static double V2DistanceBetween2Points(Vector2 *a, Vector2 *b)
 {
   double dx = (*a)[0] - (*b)[0];
   double dy = (*a)[1] - (*b)[1];
-  return (sqrt((dx * dx) + (dy * dy)));
+  return sqrt((dx * dx) + (dy * dy));
 }
 
 /* return vector sum c = a+b */
@@ -134,7 +124,7 @@ static BezierCurve GenerateBezier(
   double alpha_l; /* Alpha values, left and right */
   double alpha_r;
   Vector2 tmp;          /* Utility variable */
-  BezierCurve bezCurve; /* RETURN bezier curve ctl pts */
+  BezierCurve bezCurve; /* RETURN bezier curve control points. */
 
   bezCurve = (Vector2 *)malloc(4 * sizeof(Vector2));
   nPts = last - first + 1;
@@ -202,7 +192,7 @@ static BezierCurve GenerateBezier(
   bezCurve[3] = d[last];
   V2Add(&bezCurve[0], V2Scale(&tHat1, alpha_l), &bezCurve[1]);
   V2Add(&bezCurve[3], V2Scale(&tHat2, alpha_r), &bezCurve[2]);
-  return (bezCurve);
+  return bezCurve;
 }
 
 /*
@@ -223,7 +213,7 @@ static double *Reparameterize(Vector2 *d, int first, int last, double *u, Bezier
   for (i = first; i <= last; i++) {
     uPrime[i - first] = NewtonRaphsonRootFind(bezCurve, d[i], u[i - first]);
   }
-  return (uPrime);
+  return uPrime;
 }
 
 /*
@@ -287,7 +277,7 @@ static Vector2 BezierII(int degree, Vector2 *V, double t)
   Vector2 *Vtemp; /* Local copy of control points */
 
   /* Copy array */
-  Vtemp = (Vector2 *)malloc((unsigned)((degree + 1) * sizeof(Vector2)));
+  Vtemp = (Vector2 *)malloc(uint((degree + 1) * sizeof(Vector2)));
   for (i = 0; i <= degree; i++) {
     Vtemp[i] = V[i];
   }
@@ -390,7 +380,7 @@ static double *ChordLengthParameterize(Vector2 *d, int first, int last)
   int i;
   double *u; /* Parameterization */
 
-  u = (double *)malloc((unsigned)(last - first + 1) * sizeof(double));
+  u = (double *)malloc(uint(last - first + 1) * sizeof(double));
 
   u[0] = 0.0;
   for (i = first + 1; i <= last; i++) {
@@ -462,10 +452,6 @@ static Vector2 V2SubII(Vector2 a, Vector2 b)
 
 //------------------------- WRAPPER -----------------------------//
 
-FitCurveWrapper::FitCurveWrapper()
-{
-}
-
 FitCurveWrapper::~FitCurveWrapper()
 {
   _vertices.clear();
@@ -493,7 +479,7 @@ void FitCurveWrapper::FitCurve(vector<Vec2d> &data, vector<Vec2d> &oCurve, doubl
 
   // copy results
   for (vector<Vector2>::iterator v = _vertices.begin(), vend = _vertices.end(); v != vend; ++v) {
-    oCurve.push_back(Vec2d(v->x(), v->y()));
+    oCurve.emplace_back(v->x(), v->y());
   }
 }
 

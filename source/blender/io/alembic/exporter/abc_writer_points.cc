@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 Kévin Dietrich. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Kévin Dietrich.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -26,27 +11,23 @@
 #include "DNA_object_types.h"
 #include "DNA_particle_types.h"
 
-#include "BKE_lattice.h"
+#include "BLI_math_matrix.h"
+#include "BLI_math_vector.h"
+
 #include "BKE_particle.h"
 
-#include "BLI_math.h"
-
-#include "DEG_depsgraph_query.h"
+#include "DEG_depsgraph_query.hh"
 
 #include "CLG_log.h"
 static CLG_LogRef LOG = {"io.alembic"};
 
-namespace blender {
-namespace io {
-namespace alembic {
+namespace blender::io::alembic {
 
 using Alembic::AbcGeom::kVertexScope;
 using Alembic::AbcGeom::OPoints;
 using Alembic::AbcGeom::OPointsSchema;
 
-ABCPointsWriter::ABCPointsWriter(const ABCWriterConstructorArgs &args) : ABCAbstractWriter(args)
-{
-}
+ABCPointsWriter::ABCPointsWriter(const ABCWriterConstructorArgs &args) : ABCAbstractWriter(args) {}
 
 void ABCPointsWriter::create_alembic_objects(const HierarchyContext * /*context*/)
 {
@@ -55,9 +36,14 @@ void ABCPointsWriter::create_alembic_objects(const HierarchyContext * /*context*
   abc_points_schema_ = abc_points_.getSchema();
 }
 
-const Alembic::Abc::OObject ABCPointsWriter::get_alembic_object() const
+Alembic::Abc::OObject ABCPointsWriter::get_alembic_object() const
 {
   return abc_points_;
+}
+
+Alembic::Abc::OCompoundProperty ABCPointsWriter::abc_prop_for_custom_props()
+{
+  return abc_schema_prop_for_custom_props(abc_points_schema_);
 }
 
 bool ABCPointsWriter::is_supported(const HierarchyContext *context) const
@@ -98,7 +84,7 @@ void ABCPointsWriter::do_write(HierarchyContext &context)
   sim.ob = context.object;
   sim.psys = psys;
 
-  psys->lattice_deform_data = psys_create_lattice_deform_data(&sim);
+  psys_sim_data_init(&sim);
 
   uint64_t index = 0;
   for (int p = 0; p < psys->totpart; p++) {
@@ -109,27 +95,24 @@ void ABCPointsWriter::do_write(HierarchyContext &context)
     }
 
     state.time = DEG_get_ctime(args_.depsgraph);
-    if (psys_get_particle_state(&sim, p, &state, 0) == 0) {
+    if (psys_get_particle_state(&sim, p, &state, false) == 0) {
       continue;
     }
 
     /* location */
-    mul_v3_m4v3(pos, context.object->imat, state.co);
+    mul_v3_m4v3(pos, context.object->world_to_object().ptr(), state.co);
 
     /* velocity */
     sub_v3_v3v3(vel, state.co, psys->particles[p].prev_state.co);
 
     /* Convert Z-up to Y-up. */
-    points.push_back(Imath::V3f(pos[0], pos[2], -pos[1]));
-    velocities.push_back(Imath::V3f(vel[0], vel[2], -vel[1]));
+    points.emplace_back(pos[0], pos[2], -pos[1]);
+    velocities.emplace_back(vel[0], vel[2], -vel[1]);
     widths.push_back(psys->particles[p].size);
     ids.push_back(index++);
   }
 
-  if (psys->lattice_deform_data) {
-    BKE_lattice_deform_data_destroy(psys->lattice_deform_data);
-    psys->lattice_deform_data = NULL;
-  }
+  psys_sim_data_free(&sim);
 
   Alembic::Abc::P3fArraySample psample(points);
   Alembic::Abc::UInt64ArraySample idsample(ids);
@@ -143,6 +126,4 @@ void ABCPointsWriter::do_write(HierarchyContext &context)
   abc_points_schema_.set(sample);
 }
 
-}  // namespace alembic
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::alembic

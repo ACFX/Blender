@@ -1,35 +1,16 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup iksolver
+ * \ingroup intern_iksolver
  */
 
 #include "IK_QJacobian.h"
 
-IK_QJacobian::IK_QJacobian() : m_sdls(true), m_min_damp(1.0)
-{
-}
+IK_QJacobian::IK_QJacobian() : m_sdls(true), m_min_damp(1.0) {}
 
-IK_QJacobian::~IK_QJacobian()
-{
-}
+IK_QJacobian::~IK_QJacobian() {}
 
 void IK_QJacobian::ArmMatrices(int dof, int task_size)
 {
@@ -120,10 +101,12 @@ void IK_QJacobian::Invert()
     m_svd_v = svd.matrixV();
   }
 
-  if (m_sdls)
+  if (m_sdls) {
     InvertSDLS();
-  else
+  }
+  else {
     InvertDLS();
+  }
 }
 
 bool IK_QJacobian::ComputeNullProjection()
@@ -132,39 +115,49 @@ bool IK_QJacobian::ComputeNullProjection()
 
   // compute null space projection based on V
   int i, j, rank = 0;
-  for (i = 0; i < m_svd_w.size(); i++)
-    if (m_svd_w[i] > epsilon)
+  for (i = 0; i < m_svd_w.size(); i++) {
+    if (m_svd_w[i] > epsilon) {
       rank++;
+    }
+  }
 
-  if (rank < m_task_size)
+  if (rank < m_task_size) {
     return false;
+  }
 
   MatrixXd basis(m_svd_v.rows(), rank);
   int b = 0;
 
-  for (i = 0; i < m_svd_w.size(); i++)
+  for (i = 0; i < m_svd_w.size(); i++) {
     if (m_svd_w[i] > epsilon) {
-      for (j = 0; j < m_svd_v.rows(); j++)
+      for (j = 0; j < m_svd_v.rows(); j++) {
         basis(j, b) = m_svd_v(j, i);
+      }
       b++;
     }
+  }
 
   m_nullspace = basis * basis.transpose();
 
-  for (i = 0; i < m_nullspace.rows(); i++)
-    for (j = 0; j < m_nullspace.cols(); j++)
-      if (i == j)
+  for (i = 0; i < m_nullspace.rows(); i++) {
+    for (j = 0; j < m_nullspace.cols(); j++) {
+      if (i == j) {
         m_nullspace(i, j) = 1.0 - m_nullspace(i, j);
-      else
+      }
+      else {
         m_nullspace(i, j) = -m_nullspace(i, j);
+      }
+    }
+  }
 
   return true;
 }
 
 void IK_QJacobian::SubTask(IK_QJacobian &jacobian)
 {
-  if (!ComputeNullProjection())
+  if (!ComputeNullProjection()) {
     return;
+  }
 
   // restrict lower priority jacobian
   jacobian.Restrict(m_d_theta, m_nullspace);
@@ -176,8 +169,9 @@ void IK_QJacobian::SubTask(IK_QJacobian &jacobian)
   // SDLS, to avoid shaking when the primary task is near singularities,
   // doesn't work well at all
   int i;
-  for (i = 0; i < m_d_theta.size(); i++)
+  for (i = 0; i < m_d_theta.size(); i++) {
     m_d_theta[i] = m_d_theta[i] + /*m_min_damp * */ jacobian.AngleUpdate(i);
+  }
 }
 
 void IK_QJacobian::Restrict(VectorXd &d_theta, MatrixXd &nullspace)
@@ -196,20 +190,20 @@ void IK_QJacobian::InvertSDLS()
   // Compute the dampeds least squeares pseudo inverse of J.
   //
   // Since J is usually not invertible (most of the times it's not even
-  // square), the psuedo inverse is used. This gives us a least squares
+  // square), the pseudo inverse is used. This gives us a least squares
   // solution.
   //
   // This is fine when the J*Jt is of full rank. When J*Jt is near to
   // singular the least squares inverse tries to minimize |J(dtheta) - dX)|
-  // and doesn't try to minimize  dTheta. This results in eratic changes in
+  // and doesn't try to minimize  dTheta. This results in erratic changes in
   // angle. The damped least squares minimizes |dtheta| to try and reduce this
-  // erratic behaviour.
+  // erratic behavior.
   //
   // The selectively damped least squares (SDLS) is used here instead of the
   // DLS. The SDLS damps individual singular values, instead of using a single
   // damping term.
 
-  double max_angle_change = M_PI / 4.0;
+  double max_angle_change = M_PI_4;
   double epsilon = 1e-10;
   int i, j;
 
@@ -228,8 +222,9 @@ void IK_QJacobian::InvertSDLS()
   }
 
   for (i = 0; i < m_svd_w.size(); i++) {
-    if (m_svd_w[i] <= epsilon)
+    if (m_svd_w[i] <= epsilon) {
       continue;
+    }
 
     double wInv = 1.0 / m_svd_w[i];
     double alpha = 0.0;
@@ -265,16 +260,18 @@ void IK_QJacobian::InvertSDLS()
       // find largest absolute dTheta
       // multiply with weight to prevent unnecessary damping
       abs_dtheta = fabs(m_d_theta_tmp[j]) * m_weight_sqrt[j];
-      if (abs_dtheta > max_dtheta)
+      if (abs_dtheta > max_dtheta) {
         max_dtheta = abs_dtheta;
+      }
     }
 
     M *= wInv;
 
     // compute damping term and damp the dTheta's
     double gamma = max_angle_change;
-    if (N < M)
+    if (N < M) {
       gamma *= N / M;
+    }
 
     double damp = (gamma < max_dtheta) ? gamma / max_dtheta : 1.0;
 
@@ -284,14 +281,16 @@ void IK_QJacobian::InvertSDLS()
       // better to go a little to slow than to far
 
       double dofdamp = damp / m_weight[j];
-      if (dofdamp > 1.0)
+      if (dofdamp > 1.0) {
         dofdamp = 1.0;
+      }
 
       m_d_theta[j] += 0.80 * dofdamp * m_d_theta_tmp[j];
     }
 
-    if (damp < m_min_damp)
+    if (damp < m_min_damp) {
       m_min_damp = damp;
+    }
   }
 
   // weight + prevent from doing angle updates with angles > max_angle_change
@@ -302,15 +301,17 @@ void IK_QJacobian::InvertSDLS()
 
     abs_angle = fabs(m_d_theta[j]);
 
-    if (abs_angle > max_angle)
+    if (abs_angle > max_angle) {
       max_angle = abs_angle;
+    }
   }
 
   if (max_angle > max_angle_change) {
     double damp = (max_angle_change) / (max_angle_change + max_angle);
 
-    for (j = 0; j < m_dof; j++)
+    for (j = 0; j < m_dof; j++) {
       m_d_theta[j] *= damp;
+    }
   }
 }
 
@@ -323,9 +324,9 @@ void IK_QJacobian::InvertDLS()
   // least squares solution. This is fine when the m_jjt is
   // of full rank. When m_jjt is near to singular the least squares
   // inverse tries to minimize |J(dtheta) - dX)| and doesn't
-  // try to minimize  dTheta. This results in eratic changes in angle.
+  // try to minimize  dTheta. This results in erratic changes in angle.
   // Damped least squares minimizes |dtheta| to try and reduce this
-  // erratic behaviour.
+  // erratic behavior.
 
   // We don't want to use the damped solution everywhere so we
   // only increase lamda from zero as we approach a singularity.
@@ -341,8 +342,9 @@ void IK_QJacobian::InvertDLS()
   double w_min = std::numeric_limits<double>::max();
 
   for (i = 0; i < m_svd_w.size(); i++) {
-    if (m_svd_w[i] > epsilon && m_svd_w[i] < w_min)
+    if (m_svd_w[i] > epsilon && m_svd_w[i] < w_min) {
       w_min = m_svd_w[i];
+    }
   }
 
   // compute lambda damping term
@@ -350,17 +352,21 @@ void IK_QJacobian::InvertDLS()
   double d = x_length / max_angle_change;
   double lambda;
 
-  if (w_min <= d / 2)
+  if (w_min <= d / 2) {
     lambda = d / 2;
-  else if (w_min < d)
+  }
+  else if (w_min < d) {
     lambda = sqrt(w_min * (d - w_min));
-  else
+  }
+  else {
     lambda = 0.0;
+  }
 
   lambda *= lambda;
 
-  if (lambda > 10)
+  if (lambda > 10) {
     lambda = 10;
+  }
 
   // immediately multiply with Beta, so we can do matrix*vector products
   // rather than matrix*matrix products
@@ -377,13 +383,15 @@ void IK_QJacobian::InvertDLS()
       // compute V*Winv*Ut*Beta
       m_svd_u_beta[i] *= wInv;
 
-      for (j = 0; j < m_d_theta.size(); j++)
+      for (j = 0; j < m_d_theta.size(); j++) {
         m_d_theta[j] += m_svd_v(j, i) * m_svd_u_beta[i];
+      }
     }
   }
 
-  for (j = 0; j < m_d_theta.size(); j++)
+  for (j = 0; j < m_d_theta.size(); j++) {
     m_d_theta[j] *= m_weight[j];
+  }
 }
 
 void IK_QJacobian::Lock(int dof_id, double delta)
@@ -411,8 +419,9 @@ double IK_QJacobian::AngleUpdateNorm() const
 
   for (i = 0; i < m_d_theta.size(); i++) {
     dtheta_abs = fabs(m_d_theta[i] * m_d_norm_weight[i]);
-    if (dtheta_abs > mx)
+    if (dtheta_abs > mx) {
       mx = dtheta_abs;
+    }
   }
 
   return mx;

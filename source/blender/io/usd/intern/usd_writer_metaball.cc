@@ -1,46 +1,21 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
-#include "usd_writer_metaball.h"
-#include "usd_hierarchy_iterator.h"
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+#include "usd_writer_metaball.hh"
+#include "usd_exporter_context.hh"
 
-#include <pxr/usd/usdGeom/mesh.h>
-#include <pxr/usd/usdShade/material.h>
-#include <pxr/usd/usdShade/materialBindingAPI.h>
+#include "BKE_lib_id.hh"
+#include "BKE_mball.hh"
+#include "BKE_mesh.hh"
+#include "BKE_object.hh"
 
-#include "BLI_assert.h"
-
-#include "BKE_displist.h"
-#include "BKE_lib_id.h"
-#include "BKE_mball.h"
-#include "BKE_mesh.h"
-#include "BKE_object.h"
+#include "DEG_depsgraph_query.hh"
 
 #include "DNA_mesh_types.h"
-#include "DNA_meta_types.h"
 
-namespace blender {
-namespace io {
-namespace usd {
+namespace blender::io::usd {
 
-USDMetaballWriter::USDMetaballWriter(const USDExporterContext &ctx) : USDGenericMeshWriter(ctx)
-{
-}
+USDMetaballWriter::USDMetaballWriter(const USDExporterContext &ctx) : USDGenericMeshWriter(ctx) {}
 
 bool USDMetaballWriter::is_supported(const HierarchyContext *context) const
 {
@@ -64,7 +39,7 @@ Mesh *USDMetaballWriter::get_export_mesh(Object *object_eval, bool &r_needsfree)
     return mesh_eval;
   }
   r_needsfree = true;
-  return BKE_mesh_new_from_object(usd_export_context_.depsgraph, object_eval, false);
+  return BKE_mesh_new_from_object(usd_export_context_.depsgraph, object_eval, false, false);
 }
 
 void USDMetaballWriter::free_export_mesh(Mesh *mesh)
@@ -74,10 +49,8 @@ void USDMetaballWriter::free_export_mesh(Mesh *mesh)
 
 bool USDMetaballWriter::is_basis_ball(Scene *scene, Object *ob) const
 {
-  Object *basis_ob = BKE_mball_basis_find(scene, ob);
+  const Object *basis_ob = BKE_mball_basis_find(scene, ob);
   return ob == basis_ob;
 }
 
-}  // namespace usd
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::usd

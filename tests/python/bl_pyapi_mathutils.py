@@ -1,8 +1,10 @@
-# Apache License, Version 2.0
+# SPDX-FileCopyrightText: 2011-2022 Blender Authors
+#
+# SPDX-License-Identifier: Apache-2.0
 
-# ./blender.bin --background -noaudio --python tests/python/bl_pyapi_mathutils.py -- --verbose
+# ./blender.bin --background --python tests/python/bl_pyapi_mathutils.py -- --verbose
 import unittest
-from mathutils import Matrix, Vector, Quaternion
+from mathutils import Matrix, Vector, Quaternion, Euler
 from mathutils import kdtree, geometry
 import math
 
@@ -163,7 +165,6 @@ class MatrixTesting(unittest.TestCase):
         self.assertEqual(mat1 @ mat2, prod1)
         self.assertEqual(mat2 @ mat1, prod2)
 
-    """
     # tests for element-wise multiplication
 
     def test_matrix_mul(self):
@@ -182,7 +183,6 @@ class MatrixTesting(unittest.TestCase):
         self.assertEqual(mat1 * mat2, prod)
         self.assertEqual(mat2 * mat1, prod)
         self.assertRaises(ValueError, mat1.__mul__, mat3)
-    """
 
     def test_matrix_inverse(self):
         mat = Matrix(((1, 4, 0, -1),
@@ -233,6 +233,27 @@ class MatrixTesting(unittest.TestCase):
 
         self.assertEqual(mat @ mat, prod_mat)
 
+    def test_loc_rot_scale(self):
+        euler = Euler((math.radians(90), 0, math.radians(90)), 'ZYX')
+        expected = Matrix(((0, -5, 0, 1),
+                           (0, 0, -6, 2),
+                           (4, 0, 0, 3),
+                           (0, 0, 0, 1)))
+
+        result = Matrix.LocRotScale((1, 2, 3), euler, (4, 5, 6))
+        self.assertAlmostEqualMatrix(result, expected, 4)
+
+        result = Matrix.LocRotScale((1, 2, 3), euler.to_quaternion(), (4, 5, 6))
+        self.assertAlmostEqualMatrix(result, expected, 4)
+
+        result = Matrix.LocRotScale((1, 2, 3), euler.to_matrix(), (4, 5, 6))
+        self.assertAlmostEqualMatrix(result, expected, 4)
+
+    def assertAlmostEqualMatrix(self, first, second, size, *, places=6, msg=None, delta=None):
+        for i in range(size):
+            for j in range(size):
+                self.assertAlmostEqual(first[i][j], second[i][j], places=places, msg=msg, delta=delta)
+
 
 class VectorTesting(unittest.TestCase):
 
@@ -259,7 +280,6 @@ class VectorTesting(unittest.TestCase):
         with self.assertRaises(TypeError):
             vec @= vec
 
-    """
     # tests for element-wise multiplication
 
     def test_vector_mul(self):
@@ -285,7 +305,6 @@ class VectorTesting(unittest.TestCase):
 
         vec *= 2
         self.assertEqual(vec, prod2)
-    """
 
 
 class QuaternionTesting(unittest.TestCase):
@@ -442,20 +461,20 @@ class KDTreeTesting(unittest.TestCase):
 
                     ret_regular = k_odd.find(co)
                     self.assertEqual(ret_regular[1] % 2, 1)
-                    ret_filter = k_all.find(co, lambda i: (i % 2) == 1)
+                    ret_filter = k_all.find(co, filter=lambda i: (i % 2) == 1)
                     self.assertAlmostEqualVector(ret_regular, ret_filter)
 
                     ret_regular = k_evn.find(co)
                     self.assertEqual(ret_regular[1] % 2, 0)
-                    ret_filter = k_all.find(co, lambda i: (i % 2) == 0)
+                    ret_filter = k_all.find(co, filter=lambda i: (i % 2) == 0)
                     self.assertAlmostEqualVector(ret_regular, ret_filter)
 
         # filter out all values (search odd tree for even values and the reverse)
         co = (0,) * 3
-        ret_filter = k_odd.find(co, lambda i: (i % 2) == 0)
+        ret_filter = k_odd.find(co, filter=lambda i: (i % 2) == 0)
         self.assertEqual(ret_filter[1], None)
 
-        ret_filter = k_evn.find(co, lambda i: (i % 2) == 1)
+        ret_filter = k_evn.find(co, filter=lambda i: (i % 2) == 1)
         self.assertEqual(ret_filter[1], None)
 
     def test_kdtree_invalid_size(self):

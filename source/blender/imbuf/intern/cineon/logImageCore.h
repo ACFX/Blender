@@ -1,20 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 1999-2001 David Hodson <hodsond@acm.org>.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 1999,2000,2001 David Hodson <hodsond@acm.org>
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup imbcineon
@@ -23,17 +9,22 @@
  * Cineon and DPX common structures.
  *
  * This header file contains private details.
- * User code should generally use cineonlib.h and dpxlib.h only.
+ * User code should generally use `cineonlib.h` and `dpxlib.h` only.
  * Hmm. I thought the two formats would have more in common!
  */
 
-#ifndef __LOGIMAGECORE_H__
-#define __LOGIMAGECORE_H__
+#pragma once
 
 #include <stdio.h>
 
 #include "BLI_sys_types.h"
 #include "BLI_utildefines.h"
+
+#ifdef _WIN32
+#  define PATHSEP_CHAR '\\'
+#else
+#  define PATHSEP_CHAR '/'
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,7 +68,7 @@ typedef struct LogImageFile {
   float referenceWhite;
   float gamma;
 
-  /* io stuff */
+  /* IO stuff. */
   FILE *file;
   unsigned char *memBuffer;
   uintptr_t memBufferSize;
@@ -182,12 +173,12 @@ enum descriptor {
 /* int functions return 0 for OK */
 
 void logImageSetVerbose(int verbosity);
-int logImageIsDpx(const void *buffer);
-int logImageIsCineon(const void *buffer);
+int logImageIsDpx(const void *buffer, unsigned int size);
+int logImageIsCineon(const void *buffer, unsigned int size);
 LogImageFile *logImageOpenFromMemory(const unsigned char *buffer, unsigned int size);
-LogImageFile *logImageOpenFromFile(const char *filename, int cineon);
-void logImageGetSize(LogImageFile *logImage, int *width, int *height, int *depth);
-LogImageFile *logImageCreate(const char *filename,
+LogImageFile *logImageOpenFromFile(const char *filepath, int cineon);
+void logImageGetSize(const LogImageFile *logImage, int *width, int *height, int *depth);
+LogImageFile *logImageCreate(const char *filepath,
                              int cineon,
                              int width,
                              int height,
@@ -201,8 +192,8 @@ LogImageFile *logImageCreate(const char *filename,
 void logImageClose(LogImageFile *logImage);
 
 /* Data handling */
-size_t getRowLength(size_t width, LogImageElement logElement);
-int logImageSetDataRGBA(LogImageFile *logImage, float *data, int dataIsLinearRGB);
+size_t getRowLength(size_t width, const LogImageElement *logElement);
+int logImageSetDataRGBA(LogImageFile *logImage, const float *data, int dataIsLinearRGB);
 int logImageGetDataRGBA(LogImageFile *logImage, float *data, int dataIsLinearRGB);
 
 /*
@@ -295,5 +286,3 @@ BLI_INLINE unsigned int float_uint(float value, unsigned int max)
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __LOGIMAGECORE_H__ */

@@ -32,7 +32,10 @@
 #define CERES_INTERNAL_FUNCTION_SAMPLE_H_
 
 #include <string>
+
+#include "ceres/internal/disable_warnings.h"
 #include "ceres/internal/eigen.h"
+#include "ceres/internal/export.h"
 
 namespace ceres {
 namespace internal {
@@ -45,7 +48,7 @@ namespace internal {
 // line/direction. FunctionSample contains the information in two
 // ways. Information in the ambient space and information along the
 // direction of search.
-struct FunctionSample {
+struct CERES_NO_EXPORT FunctionSample {
   FunctionSample();
   FunctionSample(double x, double value);
   FunctionSample(double x, double value, double gradient);
@@ -85,10 +88,9 @@ struct FunctionSample {
   bool gradient_is_valid;
 };
 
-
-
-
 }  // namespace internal
 }  // namespace ceres
+
+#include "ceres/internal/reenable_warnings.h"
 
 #endif  // CERES_INTERNAL_FUNCTION_SAMPLE_H_

@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __BLI_DOT_EXPORT_HH__
-#define __BLI_DOT_EXPORT_HH__
+#pragma once
 
 /**
  * Language grammar: https://www.graphviz.org/doc/info/lang.html
@@ -31,8 +18,8 @@
 
 #include "BLI_dot_export_attribute_enums.hh"
 
+#include <iosfwd>
 #include <optional>
-#include <sstream>
 
 namespace blender::dot {
 
@@ -44,9 +31,8 @@ class NodePort;
 class DirectedEdge;
 class UndirectedEdge;
 class Cluster;
-class AttributeList;
 
-class AttributeList {
+class Attributes {
  private:
   Map<std::string, std::string> attributes_;
 
@@ -57,11 +43,15 @@ class AttributeList {
   {
     attributes_.add_overwrite(key, value);
   }
+
+  void set(StringRef key, float value)
+  {
+    attributes_.add_overwrite(key, std::to_string(value));
+  }
 };
 
 class Graph {
  private:
-  AttributeList attributes_;
   Vector<std::unique_ptr<Node>> nodes_;
   Vector<std::unique_ptr<Cluster>> clusters_;
 
@@ -72,19 +62,17 @@ class Graph {
   friend Node;
 
  public:
+  Attributes attributes;
+
+ public:
   Node &new_node(StringRef label);
   Cluster &new_cluster(StringRef label = "");
 
   void export__declare_nodes_and_clusters(std::stringstream &ss) const;
 
-  void set_attribute(StringRef key, StringRef value)
-  {
-    attributes_.set(key, value);
-  }
-
   void set_rankdir(Attr_rankdir rankdir)
   {
-    this->set_attribute("rankdir", rankdir_to_string(rankdir));
+    attributes.set("rankdir", rankdir_to_string(rankdir));
   }
 
   void set_random_cluster_bgcolors();
@@ -92,7 +80,6 @@ class Graph {
 
 class Cluster {
  private:
-  AttributeList attributes_;
   Graph &graph_;
   Cluster *parent_ = nullptr;
   Set<Cluster *> children_;
@@ -101,71 +88,69 @@ class Cluster {
   friend Graph;
   friend Node;
 
-  Cluster(Graph &graph) : graph_(graph)
-  {
-  }
+ public:
+  Attributes attributes;
+
+  Cluster(Graph &graph) : graph_(graph) {}
 
  public:
   void export__declare_nodes_and_clusters(std::stringstream &ss) const;
 
-  void set_attribute(StringRef key, StringRef value)
+  std::string name() const
   {
-    attributes_.set(key, value);
+    return "cluster_" + std::to_string(uintptr_t(this));
   }
 
-  void set_parent_cluster(Cluster *cluster);
+  void set_parent_cluster(Cluster *new_parent);
   void set_parent_cluster(Cluster &cluster)
   {
     this->set_parent_cluster(&cluster);
   }
 
+  Cluster *parent_cluster()
+  {
+    return parent_;
+  }
+
   void set_random_cluster_bgcolors();
+
+  bool contains(Node &node) const;
 };
 
 class Node {
  private:
-  AttributeList attributes_;
   Graph &graph_;
   Cluster *cluster_ = nullptr;
 
   friend Graph;
 
-  Node(Graph &graph) : graph_(graph)
-  {
-  }
+ public:
+  Attributes attributes;
+
+  Node(Graph &graph) : graph_(graph) {}
 
  public:
-  const AttributeList &attributes() const
-  {
-    return attributes_;
-  }
-
-  AttributeList &attributes()
-  {
-    return attributes_;
-  }
-
   void set_parent_cluster(Cluster *cluster);
   void set_parent_cluster(Cluster &cluster)
   {
     this->set_parent_cluster(&cluster);
   }
 
-  void set_attribute(StringRef key, StringRef value)
+  Cluster *parent_cluster()
   {
-    attributes_.set(key, value);
+    return cluster_;
   }
 
   void set_shape(Attr_shape shape)
   {
-    this->set_attribute("shape", shape_to_string(shape));
+    attributes.set("shape", shape_to_string(shape));
   }
 
   /* See https://www.graphviz.org/doc/info/attrs.html#k:color. */
   void set_background_color(StringRef name)
   {
-    this->set_attribute("fillcolor", name);
-    this->set_attribute("style", "filled");
+    attributes.set("fillcolor", name);
+    attributes.set("style", "filled");
   }
 
   void export__as_id(std::stringstream &ss) const;
@@ -197,10 +182,13 @@ class NodePort {
  private:
   Node *node_;
   std::optional<std::string> port_name_;
+  std::optional<std::string> port_position_;
 
  public:
-  NodePort(Node &node, std::optional<std::string> port_name = {})
-      : node_(&node), port_name_(std::move(port_name))
+  NodePort(Node &node,
+           std::optional<std::string> port_name = {},
+           std::optional<std::string> port_position = {})
+      : node_(&node), port_name_(std::move(port_name)), port_position_(std::move(port_position))
   {
   }
 
@@ -209,84 +197,104 @@ class NodePort {
 
 class Edge : blender::NonCopyable, blender::NonMovable {
  protected:
-  AttributeList attributes_;
   NodePort a_;
   NodePort b_;
 
  public:
-  Edge(NodePort a, NodePort b) : a_(std::move(a)), b_(std::move(b))
-  {
-  }
+  Attributes attributes;
 
-  void set_attribute(StringRef key, StringRef value)
-  {
-    attributes_.set(key, value);
-  }
+ public:
+  Edge(NodePort a, NodePort b) : a_(std::move(a)), b_(std::move(b)) {}
 
   void set_arrowhead(Attr_arrowType type)
   {
-    this->set_attribute("arrowhead", arrowType_to_string(type));
+    attributes.set("arrowhead", arrowType_to_string(type));
   }
 
   void set_arrowtail(Attr_arrowType type)
   {
-    this->set_attribute("arrowtail", arrowType_to_string(type));
+    attributes.set("arrowtail", arrowType_to_string(type));
   }
 
   void set_dir(Attr_dirType type)
   {
-    this->set_attribute("dir", dirType_to_string(type));
+    attributes.set("dir", dirType_to_string(type));
+  }
+
+  void set_label(StringRef label)
+  {
+    attributes.set("label", label);
   }
 };
 
 class DirectedEdge : public Edge {
  public:
-  DirectedEdge(NodePort from, NodePort to) : Edge(std::move(from), std::move(to))
-  {
-  }
+  DirectedEdge(NodePort from, NodePort to) : Edge(std::move(from), std::move(to)) {}
 
   void export__as_edge_statement(std::stringstream &ss) const;
 };
 
 class UndirectedEdge : public Edge {
  public:
-  UndirectedEdge(NodePort a, NodePort b) : Edge(std::move(a), std::move(b))
-  {
-  }
+  UndirectedEdge(NodePort a, NodePort b) : Edge(std::move(a), std::move(b)) {}
 
   void export__as_edge_statement(std::stringstream &ss) const;
 };
 
 std::string color_attr_from_hsv(float h, float s, float v);
 
+struct NodeWithSockets {
+  struct Socket {
+    std::string name;
+    std::optional<std::string> fontcolor;
+  };
+  struct Input : public Socket {};
+  struct Output : public Socket {};
+
+  std::string node_name;
+  Vector<Input> inputs;
+  Vector<Output> outputs;
+
+  Input &add_input(std::string name)
+  {
+    this->inputs.append({});
+    Input &input = this->inputs.last();
+    input.name = std::move(name);
+    return input;
+  }
+
+  Output &add_output(std::string name)
+  {
+    this->outputs.append({});
+    Output &output = this->outputs.last();
+    output.name = std::move(name);
+    return output;
+  }
+};
+
 class NodeWithSocketsRef {
  private:
   Node *node_;
 
  public:
-  NodeWithSocketsRef(Node &node,
-                     StringRef name,
-                     Span<std::string> input_names,
-                     Span<std::string> output_names);
+  NodeWithSocketsRef(Node &node, const NodeWithSockets &data);
 
   Node &node()
   {
     return *node_;
   }
 
-  NodePort input(uint index) const
+  NodePort input(int index) const
   {
     std::string port = "\"in" + std::to_string(index) + "\"";
-    return NodePort(*node_, port);
+    return NodePort(*node_, port, "w");
   }
 
-  NodePort output(uint index) const
+  NodePort output(int index) const
   {
     std::string port = "\"out" + std::to_string(index) + "\"";
-    return NodePort(*node_, port);
+    return NodePort(*node_, port, "e");
   }
 };
 
 }  // namespace blender::dot
-
-#endif /* __BLI_DOT_EXPORT_HH__ */

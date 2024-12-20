@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -25,9 +13,6 @@
 #include "BLI_math_base.h"
 #include "BLI_string.h"
 #include "BLI_system.h"
-#include "BLI_utildefines.h"
-
-#include "MEM_guardedalloc.h"
 
 /* for backtrace and gethostname/GetComputerName */
 #if defined(WIN32)
@@ -35,7 +20,9 @@
 
 #  include "BLI_winstuff.h"
 #else
-#  include <execinfo.h>
+#  if defined(HAVE_EXECINFO_H)
+#    include <execinfo.h>
+#  endif
 #  include <unistd.h>
 #endif
 
@@ -46,7 +33,7 @@ int BLI_cpu_support_sse2(void)
   return 1;
 #elif defined(__GNUC__) && defined(i386)
   /* for GCC x86 we check cpuid */
-  unsigned int d;
+  uint d;
   __asm__(
       "pushl %%ebx\n\t"
       "cpuid\n\t"
@@ -56,7 +43,7 @@ int BLI_cpu_support_sse2(void)
   return (d & 0x04000000) != 0;
 #elif (defined(_MSC_VER) && defined(_M_IX86))
   /* also check cpuid for MSVC x86 */
-  unsigned int d;
+  uint d;
   __asm {
     xor     eax, eax
     inc eax
@@ -71,16 +58,13 @@ int BLI_cpu_support_sse2(void)
 #endif
 }
 
-/* Windows stackwalk lives in system_win32.c */
+/* Windows stack-walk lives in system_win32.cc */
 #if !defined(_MSC_VER)
-/**
- * Write a backtrace into a file for systems which support it.
- */
-void BLI_system_backtrace(FILE *fp)
+void BLI_system_backtrace_with_os_info(FILE *fp, const void *UNUSED(os_info))
 {
-  /* ------------- */
-  /* Linux / Apple */
-#  if defined(__linux__) || defined(__APPLE__)
+  /* ----------------------- */
+  /* If system as execinfo.h */
+#  if defined(HAVE_EXECINFO_H)
 
 #    define SIZE 100
   void *buffer[SIZE];
@@ -88,7 +72,14 @@ void BLI_system_backtrace(FILE *fp)
   char **strings;
   int i;
 
-  /* include a backtrace for good measure */
+  /* Include a back-trace for good measure.
+   *
+   * NOTE: often values printed are addresses (no line numbers of function names),
+   * this information can be expanded using `addr2line`, a utility is included to
+   * conveniently run addr2line on the output generated here:
+   *
+   *   `./tools/utils/addr2line_backtrace.py --exe=/path/to/blender trace.txt`
+   */
   nptrs = backtrace(buffer, SIZE);
   strings = backtrace_symbols(buffer, nptrs);
   for (i = 0; i < nptrs; i++) {
@@ -100,13 +91,18 @@ void BLI_system_backtrace(FILE *fp)
 #    undef SIZE
 
 #  else
-  /* ------------------ */
-  /* non msvc/osx/linux */
+  /* --------------------- */
+  /* Non MSVC/Apple/Linux. */
   (void)fp;
 #  endif
 }
 #endif
-/* end BLI_system_backtrace */
+/* end BLI_system_backtrace_with_os_info */
+
+void BLI_system_backtrace(FILE *fp)
+{
+  BLI_system_backtrace_with_os_info(fp, NULL);
+}
 
 /* NOTE: The code for CPU brand string is adopted from Cycles. */
 
@@ -128,6 +124,7 @@ static void __cpuid(
       : "a"(selector)
       : "ebx");
 #  else
+  (void)selector;
   data[0] = data[1] = data[2] = data[3] = 0;
 #  endif
 }
@@ -135,7 +132,8 @@ static void __cpuid(
 
 char *BLI_cpu_brand_string(void)
 {
-  char buf[48] = {0};
+#if !defined(_M_ARM64)
+  char buf[49] = {0};
   int result[4] = {0};
   __cpuid(result, 0x80000000);
   if (result[0] >= (int)0x80000004) {
@@ -146,19 +144,36 @@ char *BLI_cpu_brand_string(void)
     /* TODO(sergey): Make it a bit more presentable by removing trademark. */
     return brand;
   }
+#else
+  /* No CPUID on ARM64, so we pull from the registry (on Windows) instead. */
+  DWORD processorNameStringLength = 255;
+  char processorNameString[255];
+  if (RegGetValueA(HKEY_LOCAL_MACHINE,
+                   "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                   "ProcessorNameString",
+                   RRF_RT_REG_SZ,
+                   NULL,
+                   &processorNameString,
+                   &processorNameStringLength) == ERROR_SUCCESS)
+  {
+    return BLI_strdup(processorNameString);
+  }
+#endif
   return NULL;
 }
 
-int BLI_cpu_support_sse41(void)
+int BLI_cpu_support_sse42(void)
 {
+#if !defined(_M_ARM64)
   int result[4], num;
   __cpuid(result, 0);
   num = result[0];
 
   if (num >= 1) {
     __cpuid(result, 0x00000001);
-    return (result[2] & ((int)1 << 19)) != 0;
+    return (result[2] & ((int)1 << 20)) != 0;
   }
+#endif
   return 0;
 }
 
@@ -168,12 +183,12 @@ void BLI_hostname_get(char *buffer, size_t bufsize)
   if (gethostname(buffer, bufsize - 1) < 0) {
     BLI_strncpy(buffer, "-unknown-", bufsize);
   }
-  /* When gethostname() truncates, it doesn't guarantee the trailing \0. */
+  /* When `gethostname()` truncates, it doesn't guarantee the trailing `\0`. */
   buffer[bufsize - 1] = '\0';
 #else
   DWORD bufsize_inout = bufsize;
   if (!GetComputerName(buffer, &bufsize_inout)) {
-    strncpy(buffer, "-unknown-", bufsize);
+    BLI_strncpy(buffer, "-unknown-", bufsize);
   }
 #endif
 }
@@ -183,7 +198,7 @@ size_t BLI_system_memory_max_in_megabytes(void)
   /* Maximum addressable bytes on this platform.
    *
    * NOTE: Due to the shift arithmetic this is a half of the memory. */
-  const size_t limit_bytes_half = (((size_t)1) << ((sizeof(size_t) * 8) - 1));
+  const size_t limit_bytes_half = (((size_t)1) << (sizeof(size_t[8]) - 1));
   /* Convert it to megabytes and return. */
   return (limit_bytes_half >> 20) * 2;
 }

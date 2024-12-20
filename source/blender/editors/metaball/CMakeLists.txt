@@ -1,31 +1,15 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
   ../../blenkernel
-  ../../blenlib
-  ../../depsgraph
-  ../../makesdna
+  ../../blentranslation
+  ../../gpu
   ../../makesrna
-  ../../render/extern/include
+  ../../render
   ../../windowmanager
-  ../../../../intern/clog
-  ../../../../intern/guardedalloc
 )
 
 set(INC_SYS
@@ -33,14 +17,19 @@ set(INC_SYS
 )
 
 set(SRC
-  editmball_undo.c
-  mball_edit.c
-  mball_ops.c
+  editmball_undo.cc
+  mball_edit.cc
+  mball_ops.cc
 
-  mball_intern.h
+  mball_intern.hh
 )
 
 set(LIB
+  PRIVATE bf::blenlib
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
 )
 
 blender_add_lib(bf_editor_metaball "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

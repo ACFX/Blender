@@ -1,37 +1,14 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_CURVEPROFILE_TYPES_H__
-#define __DNA_CURVEPROFILE_TYPES_H__
+#pragma once
 
 #include "DNA_vec_types.h"
-
-/** Number of points in high resolution table is dynamic up to a maximum. */
-#define PROF_TABLE_MAX 512
-/** Number of table points per control point. */
-#define PROF_RESOL 16
-/** Dynamic size of widget's high resolution table. Input should be profile->totpoint. */
-#define PROF_N_TABLE(n_pts) min_ii(PROF_TABLE_MAX, (((n_pts - 1)) * PROF_RESOL) + 1)
 
 /**
  * Each control point that makes up the profile.
@@ -69,7 +46,7 @@ typedef struct CurveProfile {
   short segments_len;
   /** Preset to use when reset. */
   int preset;
-  /** Sequence of points defining the shape of the curve.  */
+  /** Sequence of points defining the shape of the curve. */
   CurveProfilePoint *path;
   /** Display and evaluation table at higher resolution for curves. */
   CurveProfilePoint *table;
@@ -99,5 +76,3 @@ typedef enum eCurveProfilePresets {
   PROF_PRESET_CROWN = 3,    /* Second molding example. */
   PROF_PRESET_STEPS = 4,    /* Dynamic number of steps defined by segments_len. */
 } eCurveProfilePresets;
-
-#endif /* __DNA_CURVEPROFILE_TYPES_H__ */

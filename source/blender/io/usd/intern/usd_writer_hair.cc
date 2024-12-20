@@ -1,23 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
-#include "usd_writer_hair.h"
-#include "usd_hierarchy_iterator.h"
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+#include "usd_writer_hair.hh"
+#include "usd_hierarchy_iterator.hh"
 
 #include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/tokens.h>
@@ -26,13 +11,9 @@
 
 #include "DNA_particle_types.h"
 
-namespace blender {
-namespace io {
-namespace usd {
+namespace blender::io::usd {
 
-USDHairWriter::USDHairWriter(const USDExporterContext &ctx) : USDAbstractWriter(ctx)
-{
-}
+USDHairWriter::USDHairWriter(const USDExporterContext &ctx) : USDAbstractWriter(ctx) {}
 
 void USDHairWriter::do_write(HierarchyContext &context)
 {
@@ -46,7 +27,7 @@ void USDHairWriter::do_write(HierarchyContext &context)
   pxr::UsdGeomBasisCurves curves = pxr::UsdGeomBasisCurves::Define(usd_export_context_.stage,
                                                                    usd_export_context_.usd_path);
 
-  // TODO(Sybren): deal with (psys->part->flag & PART_HAIR_BSPLINE)
+  /* TODO(Sybren): deal with (psys->part->flag & PART_HAIR_BSPLINE) */
   curves.CreateBasisAttr(pxr::VtValue(pxr::UsdGeomTokens->bspline));
   curves.CreateTypeAttr(pxr::VtValue(pxr::UsdGeomTokens->cubic));
 
@@ -80,13 +61,18 @@ void USDHairWriter::do_write(HierarchyContext &context)
     colors.push_back(pxr::GfVec3f(cache[0]->col));
     curves.CreateDisplayColorAttr(pxr::VtValue(colors));
   }
+
+  if (psys->part) {
+    auto prim = curves.GetPrim();
+    write_id_properties(prim, psys->part->id, timecode);
+  }
+
+  this->author_extent(timecode, curves);
 }
 
-bool USDHairWriter::check_is_animated(const HierarchyContext &UNUSED(context)) const
+bool USDHairWriter::check_is_animated(const HierarchyContext & /*context*/) const
 {
   return true;
 }
 
-}  // namespace usd
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::usd

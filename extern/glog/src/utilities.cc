@@ -259,7 +259,13 @@ pid_t GetTID() {
 #endif
   static bool lacks_gettid = false;
   if (!lacks_gettid) {
+#ifdef OS_MACOSX
+    uint64_t tid64;
+    const int error = pthread_threadid_np(NULL, &tid64);
+    pid_t tid = error ? -1 : (pid_t)tid64;
+#else
     pid_t tid = syscall(__NR_gettid);
+#endif
     if (tid != -1) {
       return tid;
     }
@@ -276,6 +282,8 @@ pid_t GetTID() {
   return getpid();  // Linux:  getpid returns thread ID when gettid is absent
 #elif defined OS_WINDOWS && !defined OS_CYGWIN
   return GetCurrentThreadId();
+#elif defined OS_OPENBSD
+  return getthrid();
 #else
   // If none of the techniques above worked, we use pthread_self().
   return (pid_t)(uintptr_t)pthread_self();

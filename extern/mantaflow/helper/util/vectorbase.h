@@ -31,13 +31,6 @@
 #  undef max
 #endif
 
-// redefine usage of some windows functions
-#if defined(WIN32) || defined(_WIN32)
-#  ifndef snprintf
-#    define snprintf _snprintf
-#  endif
-#endif
-
 // use which fp-precision? 1=float, 2=double
 #ifndef FLOATINGPOINT_PRECISION
 #  define FLOATINGPOINT_PRECISION 1
@@ -439,6 +432,36 @@ inline Real normSquare(const int v)
   return square(v);
 }
 
+//! Compute sum of all components, allow use of int, Real too
+template<class S> inline S sum(const S v)
+{
+  return v;
+}
+template<class S> inline S sum(const Vector3D<S> &v)
+{
+  return v.x + v.y + v.z;
+}
+
+//! Get absolute representation of vector, allow use of int, Real too
+inline Real abs(const Real v)
+{
+  return std::fabs(v);
+}
+inline int abs(const int v)
+{
+  return std::abs(v);
+}
+
+template<class S> inline Vector3D<S> abs(const Vector3D<S> &v)
+{
+  Vector3D<S> cp(v.x, v.y, v.z);
+  for (int i = 0; i < 3; ++i) {
+    if (cp[i] < 0)
+      cp[i] *= (-1.0);
+  }
+  return cp;
+}
+
 //! Returns a normalized vector
 template<class S> inline Vector3D<S> getNormalized(const Vector3D<S> &v)
 {
@@ -632,6 +655,11 @@ template<class T> inline Vec3i toVec3i(T v0, T v1, T v2)
 template<class T> inline Vec3i toVec3iRound(T v)
 {
   return Vec3i((int)round(v[0]), (int)round(v[1]), (int)round(v[2]));
+}
+
+template<class T> inline Vec3i toVec3iFloor(T v)
+{
+  return Vec3i((int)floor(v[0]), (int)floor(v[1]), (int)floor(v[2]));
 }
 
 //! convert to int Vector if values are close enough to an int

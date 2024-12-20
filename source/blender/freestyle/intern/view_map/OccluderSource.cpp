@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -23,7 +11,9 @@
 
 #include "OccluderSource.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 namespace Freestyle {
 
@@ -33,9 +23,7 @@ OccluderSource::OccluderSource(const GridHelpers::Transform &t, WingedEdge &we)
   begin();
 }
 
-OccluderSource::~OccluderSource()
-{
-}
+OccluderSource::~OccluderSource() = default;
 
 void OccluderSource::buildCachedPolygon()
 {
@@ -77,11 +65,10 @@ bool OccluderSource::next()
         valid = false;
         return false;
       }
-      else {
-        vector<WFace *> &wFaces = (*currentShape)->GetFaceList();
-        currentFace = wFaces.begin();
-        facesEnd = wFaces.end();
-      }
+
+      vector<WFace *> &wFaces = (*currentShape)->GetFaceList();
+      currentFace = wFaces.begin();
+      facesEnd = wFaces.end();
     }
     buildCachedPolygon();
     return true;
@@ -98,7 +85,7 @@ bool OccluderSource::isValid()
 
 WFace *OccluderSource::getWFace()
 {
-  return valid ? *currentFace : NULL;
+  return valid ? *currentFace : nullptr;
 }
 
 Polygon3r OccluderSource::getCameraSpacePolygon()
@@ -131,7 +118,7 @@ void OccluderSource::getOccluderProscenium(real proscenium[4])
 real OccluderSource::averageOccluderArea()
 {
   real area = 0.0;
-  unsigned numFaces = 0;
+  uint numFaces = 0;
   for (begin(); isValid(); next()) {
     Vec3r min, max;
     cachedPolygon.getBBox(min, max);

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2018 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2018 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -23,11 +8,11 @@
 
 #include "BLI_timer.h"
 #include "BLI_listbase.h"
+#include "BLI_time.h"
 
 #include "MEM_guardedalloc.h"
-#include "PIL_time.h"
 
-#define GET_TIME() PIL_check_seconds_timer()
+#define GET_TIME() BLI_time_now_seconds()
 
 typedef struct TimedFunction {
   struct TimedFunction *next, *prev;
@@ -130,13 +115,13 @@ static void remove_tagged_functions(void)
   }
 }
 
-void BLI_timer_execute()
+void BLI_timer_execute(void)
 {
   execute_functions_if_necessary();
   remove_tagged_functions();
 }
 
-void BLI_timer_free()
+void BLI_timer_free(void)
 {
   LISTBASE_FOREACH (TimedFunction *, timed_func, &GlobalTimer.funcs) {
     timed_func->tag_removal = true;

@@ -1,37 +1,29 @@
-/*
- * Copyright 2011-2020 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2020 Blender Authors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: Apache-2.0 */
+
+/** \file
+ * \ingroup intern_sky_modal
  */
 
 #include "sky_float3.h"
 #include "sky_model.h"
 
 /* Constants */
-static const float rayleigh_scale = 8000.0f;        // Rayleigh scale height (m)
-static const float mie_scale = 1200.0f;             // Mie scale height (m)
-static const float mie_coeff = 2e-5f;               // Mie scattering coefficient
-static const float mie_G = 0.76f;                   // aerosols anisotropy
-static const float sqr_G = mie_G * mie_G;           // squared aerosols anisotropy
-static const float earth_radius = 6360000.0f;       // radius of Earth (m)
-static const float atmosphere_radius = 6420000.0f;  // radius of atmosphere (m)
-static const int steps = 32;                        // segments per primary ray
-static const int steps_light = 16;                  // segments per sun connection ray
-static const int num_wavelengths = 21;              // number of wavelengths
-static const int max_luminous_efficacy = 683;       // maximum luminous efficacy
-static const float step_lambda = (num_wavelengths - 1) *
-                                 1e-9f;  // step between each sampled wavelength
-/* irradiance at top of atmosphere */
+static const float rayleigh_scale = 8e3f;       /* Rayleigh scale height (m). */
+static const float mie_scale = 1.2e3f;          /* Mie scale height (m). */
+static const float mie_coeff = 2e-5f;           /* Mie scattering coefficient (m^-1). */
+static const float mie_G = 0.76f;               /* aerosols anisotropy. */
+static const float sqr_G = mie_G * mie_G;       /* squared aerosols anisotropy. */
+static const float earth_radius = 6360e3f;      /* radius of Earth (m). */
+static const float atmosphere_radius = 6420e3f; /* radius of atmosphere (m). */
+static const int steps = 32;                    /* segments of primary ray. */
+static const int num_wavelengths = 21;          /* number of wavelengths. */
+static const int min_wavelength = 380;          /* lowest sampled wavelength (nm). */
+static const int max_wavelength = 780;          /* highest sampled wavelength (nm). */
+/* Step between each sampled wavelength (nm). */
+static const float step_lambda = (max_wavelength - min_wavelength) / (num_wavelengths - 1);
+/* Sun irradiance on top of the atmosphere (W*m^-2*nm^-1) */
 static const float irradiance[] = {
     1.45756829855592995315f, 1.56596305559738380175f, 1.65148449067670455293f,
     1.71496242737209314555f, 1.75797983805020541226f, 1.78256407885924539336f,
@@ -40,7 +32,7 @@ static const float irradiance[] = {
     1.61993437242451854274f, 1.57083597368892080581f, 1.51932335059305478886f,
     1.46628494965214395407f, 1.41245852740172450623f, 1.35844961970384092709f,
     1.30474913844739281998f, 1.25174963272610817455f, 1.19975998755420620867f};
-/* Rayleigh scattering coefficient */
+/* Rayleigh scattering coefficient (m^-1) */
 static const float rayleigh_coeff[] = {
     0.00005424820087636473f, 0.00004418549866505454f, 0.00003635151910165377f,
     0.00003017929012024763f, 0.00002526320226989157f, 0.00002130859310621843f,
@@ -49,7 +41,7 @@ static const float rayleigh_coeff[] = {
     0.00000765513700977967f, 0.00000674217203751443f, 0.00000596134125832052f,
     0.00000529034598065810f, 0.00000471115687557433f, 0.00000420910481110487f,
     0.00000377218381260133f, 0.00000339051255477280f, 0.00000305591531679811f};
-/* Ozone absorption coefficient */
+/* Ozone absorption coefficient (m^-1) */
 static const float ozone_coeff[] = {
     0.00000000325126849861f, 0.00000000585395365047f, 0.00000001977191155085f,
     0.00000007309568762914f, 0.00000020084561514287f, 0.00000040383958096161f,
@@ -81,12 +73,40 @@ static const float cmf_xyz[][3] = {{0.00136800000f, 0.00003900000f, 0.0064500010
                                    {0.00016615050f, 0.00006000000f, 0.00000000000f},
                                    {0.00004150994f, 0.00001499000f, 0.00000000000f}};
 
+/* Parameters for optical depth quadrature.
+ * See the comment in ray_optical_depth for more detail.
+ * Computed using sympy and following Python code:
+ * # from sympy.integrals.quadrature import gauss_laguerre
+ * # from sympy import exp
+ * # x, w = gauss_laguerre(8, 50)
+ * # xend = 25
+ * # print([(xi / xend).evalf(10) for xi in x])
+ * # print([(wi * exp(xi) / xend).evalf(10) for xi, wi in zip(x, w)])
+ */
+static const int quadrature_steps = 8;
+static const float quadrature_nodes[] = {0.006811185292f,
+                                         0.03614807107f,
+                                         0.09004346519f,
+                                         0.1706680068f,
+                                         0.2818362161f,
+                                         0.4303406404f,
+                                         0.6296271457f,
+                                         0.9145252695f};
+static const float quadrature_weights[] = {0.01750893642f,
+                                           0.04135477391f,
+                                           0.06678839063f,
+                                           0.09507698807f,
+                                           0.1283416365f,
+                                           0.1707430204f,
+                                           0.2327233347f,
+                                           0.3562490486f};
+
 static float3 geographical_to_direction(float lat, float lon)
 {
   return make_float3(cosf(lat) * cosf(lon), cosf(lat) * sinf(lon), sinf(lat));
 }
 
-static float3 spec_to_xyz(float *spectrum)
+static float3 spec_to_xyz(const float *spectrum)
 {
   float3 xyz = make_float3(0.0f, 0.0f, 0.0f);
   for (int i = 0; i < num_wavelengths; i++) {
@@ -94,11 +114,10 @@ static float3 spec_to_xyz(float *spectrum)
     xyz.y += cmf_xyz[i][1] * spectrum[i];
     xyz.z += cmf_xyz[i][2] * spectrum[i];
   }
-  return xyz * step_lambda * max_luminous_efficacy;
+  return xyz * step_lambda;
 }
 
 /* Atmosphere volume models */
-
 static float density_rayleigh(float height)
 {
   return expf(-height / rayleigh_scale);
@@ -112,10 +131,12 @@ static float density_mie(float height)
 static float density_ozone(float height)
 {
   float den = 0.0f;
-  if (height >= 10000.0f && height < 25000.0f)
+  if (height >= 10000.0f && height < 25000.0f) {
     den = 1.0f / 15000.0f * height - 2.0f / 3.0f;
-  else if (height >= 25000 && height < 40000)
+  }
+  else if (height >= 25000 && height < 40000) {
     den = -(1.0f / 15000.0f * height - 8.0f / 3.0f);
+  }
   return den;
 }
 
@@ -133,13 +154,16 @@ static float phase_mie(float mu)
 /* Intersection helpers */
 static bool surface_intersection(float3 pos, float3 dir)
 {
-  if (dir.z >= 0)
+  if (dir.z >= 0) {
     return false;
-  float t = dot(dir, -pos) / len_squared(dir);
-  float D = pos.x * pos.x - 2.0f * (-pos.x) * dir.x * t + dir.x * t * dir.x * t + pos.y * pos.y -
-            2.0f * (-pos.y) * dir.y * t + (dir.y * t) * (dir.y * t) + pos.z * pos.z -
-            2.0f * (-pos.z) * dir.z * t + dir.z * t * dir.z * t;
-  return (D <= sqr(earth_radius));
+  }
+  float b = -2.0f * dot(dir, -pos);
+  float c = len_squared(pos) - sqr(earth_radius);
+  float t = b * b - 4.0f * c;
+  if (t >= 0.0f) {
+    return true;
+  }
+  return false;
 }
 
 static float3 atmosphere_intersection(float3 pos, float3 dir)
@@ -152,41 +176,40 @@ static float3 atmosphere_intersection(float3 pos, float3 dir)
 
 static float3 ray_optical_depth(float3 ray_origin, float3 ray_dir)
 {
-  /* This code computes the optical depth along a ray through the atmosphere. */
+  /* This function computes the optical depth along a ray.
+   * Instead of using classic ray marching, the code is based on Gauss-Laguerre quadrature,
+   * which is designed to compute the integral of f(x)*exp(-x) from 0 to infinity.
+   * This works well here, since the optical depth along the ray tends to decrease exponentially.
+   * By setting f(x) = g(x) exp(x), the exponentials cancel out and we get the integral of g(x).
+   * The nodes and weights used here are the standard n=6 Gauss-Laguerre values, except that
+   * the exp(x) scaling factor is already included in the weights.
+   * The parametrization along the ray is scaled so that the last quadrature node is still within
+   * the atmosphere. */
   float3 ray_end = atmosphere_intersection(ray_origin, ray_dir);
   float ray_length = distance(ray_origin, ray_end);
 
-  /* To compute the optical depth, we step along the ray in segments and
-   * accumulate the optical depth along each segment. */
-  float segment_length = ray_length / steps_light;
-  float3 segment = segment_length * ray_dir;
+  float3 segment = ray_length * ray_dir;
 
-  /* Instead of tracking the transmission spectrum across all wavelengths directly,
+  /* instead of tracking the transmission spectrum across all wavelengths directly,
    * we use the fact that the density always has the same spectrum for each type of
    * scattering, so we split the density into a constant spectrum and a factor and
-   * only track the factors. */
+   * only track the factors */
   float3 optical_depth = make_float3(0.0f, 0.0f, 0.0f);
 
-  /* The density of each segment is evaluated at its middle. */
-  float3 P = ray_origin + 0.5f * segment;
+  for (int i = 0; i < quadrature_steps; i++) {
+    float3 P = ray_origin + quadrature_nodes[i] * segment;
 
-  for (int i = 0; i < steps_light; i++) {
-    /* Compute height above sea level. */
+    /* height above sea level */
     float height = len(P) - earth_radius;
 
-    /* Accumulate optical depth of this segment (density is assumed to be constant along it). */
     float3 density = make_float3(
         density_rayleigh(height), density_mie(height), density_ozone(height));
-    optical_depth += density;
-
-    /* Advance along ray. */
-    P += segment;
+    optical_depth += density * quadrature_weights[i];
   }
 
-  return optical_depth * segment_length;
+  return optical_depth * ray_length;
 }
 
-/* Single Scattering implementation */
 static void single_scattering(float3 ray_dir,
                               float3 sun_dir,
                               float3 ray_origin,
@@ -195,45 +218,45 @@ static void single_scattering(float3 ray_dir,
                               float ozone_density,
                               float *r_spectrum)
 {
-  /* This code computes single-inscattering along a ray through the atmosphere. */
+  /* this code computes single-inscattering along a ray through the atmosphere */
   float3 ray_end = atmosphere_intersection(ray_origin, ray_dir);
   float ray_length = distance(ray_origin, ray_end);
 
-  /* To compute the inscattering, we step along the ray in segments and accumulate
-   * the inscattering as well as the optical depth along each segment. */
+  /* to compute the inscattering, we step along the ray in segments and accumulate
+   * the inscattering as well as the optical depth along each segment */
   float segment_length = ray_length / steps;
   float3 segment = segment_length * ray_dir;
 
-  /* Instead of tracking the transmission spectrum across all wavelengths directly,
+  /* instead of tracking the transmission spectrum across all wavelengths directly,
    * we use the fact that the density always has the same spectrum for each type of
    * scattering, so we split the density into a constant spectrum and a factor and
-   * only track the factors. */
+   * only track the factors */
   float3 optical_depth = make_float3(0.0f, 0.0f, 0.0f);
 
-  /* Zero out light accumulation. */
+  /* zero out light accumulation */
   for (int wl = 0; wl < num_wavelengths; wl++) {
     r_spectrum[wl] = 0.0f;
   }
 
-  /* Compute phase function for scattering and the density scale factor. */
+  /* phase function for scattering and the density scale factor */
   float mu = dot(ray_dir, sun_dir);
   float3 phase_function = make_float3(phase_rayleigh(mu), phase_mie(mu), 0.0f);
   float3 density_scale = make_float3(air_density, dust_density, ozone_density);
 
-  /* The density and in-scattering of each segment is evaluated at its middle. */
+  /* the density and in-scattering of each segment is evaluated at its middle */
   float3 P = ray_origin + 0.5f * segment;
 
   for (int i = 0; i < steps; i++) {
-    /* Compute height above sea level. */
+    /* height above sea level */
     float height = len(P) - earth_radius;
 
-    /* Evaluate and accumulate optical depth along the ray. */
+    /* evaluate and accumulate optical depth along the ray */
     float3 density = density_scale * make_float3(density_rayleigh(height),
                                                  density_mie(height),
                                                  density_ozone(height));
     optical_depth += segment_length * density;
 
-    /* If the earth isn't in the way, evaluate inscattering from the sun. */
+    /* if the Earth isn't in the way, evaluate inscattering from the sun */
     if (!surface_intersection(P, sun_dir)) {
       float3 light_optical_depth = density_scale * ray_optical_depth(P, sun_dir);
       float3 total_optical_depth = optical_depth + light_optical_depth;
@@ -247,7 +270,7 @@ static void single_scattering(float3 ray_dir,
 
         float3 scattering_density = density * make_float3(rayleigh_coeff[wl], mie_coeff, 0.0f);
 
-        /* The total inscattered radiance from one segment is:
+        /* the total inscattered radiance from one segment is:
          * Tr(A<->B) * Tr(B<->C) * sigma_s * phase * L * segment_length
          *
          * These terms are:
@@ -258,19 +281,18 @@ static void single_scattering(float3 ray_dir,
          * length of the segment
          *
          * The code here is just that, with a bit of additional optimization to not store full
-         * spectra for the optical depth.
+         * spectra for the optical depth
          */
         r_spectrum[wl] += attenuation * reduce_add(phase_function * scattering_density) *
                           irradiance[wl] * segment_length;
       }
     }
 
-    /* Advance along ray. */
+    /* advance along ray */
     P += segment;
   }
 }
 
-/* calculate texture array */
 void SKY_nishita_skymodel_precompute_texture(float *pixels,
                                              int stride,
                                              int start_y,
@@ -295,7 +317,7 @@ void SKY_nishita_skymodel_precompute_texture(float *pixels,
 
   for (int y = start_y; y < end_y; y++) {
     /* sample more pixels toward the horizon */
-    float latitude = (M_PI_2_F + half_lat_step) * sqr((float)y / height);
+    float latitude = (M_PI_2_F + half_lat_step) * sqr(float(y) / height);
 
     float *pixel_row = pixels + (y * width * stride);
     for (int x = 0; x < half_width; x++) {
@@ -305,6 +327,7 @@ void SKY_nishita_skymodel_precompute_texture(float *pixels,
       single_scattering(dir, sun_dir, cam_pos, air_density, dust_density, ozone_density, spectrum);
       float3 xyz = spec_to_xyz(spectrum);
 
+      /* store pixels */
       int pos_x = x * stride;
       pixel_row[pos_x] = xyz.x;
       pixel_row[pos_x + 1] = xyz.y;
@@ -318,7 +341,7 @@ void SKY_nishita_skymodel_precompute_texture(float *pixels,
   }
 }
 
-/* Sun disc */
+/*********** Sun ***********/
 static void sun_radiation(float3 cam_dir,
                           float altitude,
                           float air_density,
@@ -329,9 +352,9 @@ static void sun_radiation(float3 cam_dir,
   float3 cam_pos = make_float3(0, 0, earth_radius + altitude);
   float3 optical_depth = ray_optical_depth(cam_pos, cam_dir);
 
-  /* Compute final spectrum. */
+  /* compute final spectrum */
   for (int i = 0; i < num_wavelengths; i++) {
-    /* Combine spectra and the optical depth into transmittance. */
+    /* combine spectra and the optical depth into transmittance */
     float transmittance = rayleigh_coeff[i] * optical_depth.x * air_density +
                           1.11f * mie_coeff * optical_depth.y * dust_density;
     r_spectrum[i] = irradiance[i] * expf(-transmittance) / solid_angle;

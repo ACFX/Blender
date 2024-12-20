@@ -34,8 +34,10 @@
 #define CERES_INTERNAL_SPARSE_MATRIX_H_
 
 #include <cstdio>
-#include "ceres/linear_operator.h"
+
 #include "ceres/internal/eigen.h"
+#include "ceres/internal/export.h"
+#include "ceres/linear_operator.h"
 #include "ceres/types.h"
 
 namespace ceres {
@@ -62,14 +64,14 @@ namespace internal {
 // matrix type dependent and we are at this stage unable to come up
 // with an efficient high level interface that spans multiple sparse
 // matrix types.
-class SparseMatrix : public LinearOperator {
+class CERES_NO_EXPORT SparseMatrix : public LinearOperator {
  public:
-  virtual ~SparseMatrix();
+  ~SparseMatrix() override;
 
   // y += Ax;
-  virtual void RightMultiply(const double* x, double* y) const = 0;
+  void RightMultiply(const double* x, double* y) const override = 0;
   // y += A'x;
-  virtual void LeftMultiply(const double* x, double* y) const = 0;
+  void LeftMultiply(const double* x, double* y) const override = 0;
 
   // In MATLAB notation sum(A.*A, 1)
   virtual void SquaredColumnNorm(double* x) const = 0;
@@ -96,8 +98,8 @@ class SparseMatrix : public LinearOperator {
   virtual double* mutable_values() = 0;
   virtual const double* values() const = 0;
 
-  virtual int num_rows() const = 0;
-  virtual int num_cols() const = 0;
+  int num_rows() const override = 0;
+  int num_cols() const override = 0;
   virtual int num_nonzeros() const = 0;
 };
 

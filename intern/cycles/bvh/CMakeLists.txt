@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
 
 set(INC
   ..
@@ -9,32 +12,48 @@ set(INC_SYS
 set(SRC
   bvh.cpp
   bvh2.cpp
-  bvh_binning.cpp
-  bvh_build.cpp
-  bvh_embree.cpp
-  bvh_node.cpp
-  bvh_optix.cpp
-  bvh_sort.cpp
-  bvh_split.cpp
-  bvh_unaligned.cpp
+  binning.cpp
+  build.cpp
+  embree.cpp
+  hiprt.cpp
+  multi.cpp
+  node.cpp
+  optix.cpp
+  sort.cpp
+  split.cpp
+  unaligned.cpp
 )
+
+set(SRC_METAL
+  metal.mm
+)
+
+if(WITH_CYCLES_DEVICE_METAL)
+  list(APPEND SRC
+    ${SRC_METAL}
+  )
+  add_definitions(-DWITH_METAL)
+endif()
 
 set(SRC_HEADERS
   bvh.h
   bvh2.h
-  bvh_binning.h
-  bvh_build.h
-  bvh_embree.h
-  bvh_node.h
-  bvh_optix.h
-  bvh_params.h
-  bvh_sort.h
-  bvh_split.h
-  bvh_unaligned.h
+  binning.h
+  build.h
+  embree.h
+  hiprt.h
+  multi.h
+  node.h
+  optix.h
+  params.h
+  sort.h
+  split.h
+  unaligned.h
+  metal.h
 )
 
 set(LIB
-  cycles_render
+  cycles_scene
   cycles_util
 )
 
@@ -45,6 +64,11 @@ if(WITH_CYCLES_EMBREE)
   list(APPEND LIB
     ${EMBREE_LIBRARIES}
   )
+  if(EMBREE_SYCL_SUPPORT)
+    list(APPEND LIB
+      ${SYCL_LIBRARIES}
+    )
+  endif()
 endif()
 
 cycles_add_library(cycles_bvh "${LIB}" ${SRC} ${SRC_HEADERS})

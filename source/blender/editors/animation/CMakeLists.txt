@@ -1,74 +1,73 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
   ../../blenkernel
-  ../../blenlib
   ../../blentranslation
-  ../../depsgraph
   ../../gpu
-  ../../makesdna
   ../../makesrna
+  ../../sequencer
   ../../windowmanager
-  ../../../../intern/clog
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  ../../../../extern/fmtlib/include
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
-  ${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
-  anim_channels_defines.c
-  anim_channels_edit.c
-  anim_deps.c
-  anim_draw.c
-  anim_filter.c
-  anim_ipo_utils.c
-  anim_markers.c
-  anim_motion_paths.c
-  anim_ops.c
-  drivers.c
-  fmodifier_ui.c
-  keyframes_draw.c
-  keyframes_edit.c
-  keyframes_general.c
-  keyframing.c
-  keyingsets.c
-  time_scrub_ui.c
+  anim_channels_defines.cc
+  anim_channels_edit.cc
+  anim_deps.cc
+  anim_draw.cc
+  anim_filter.cc
+  anim_ipo_utils.cc
+  anim_markers.cc
+  anim_motion_paths.cc
+  anim_ops.cc
+  drivers.cc
+  fmodifier_ui.cc
+  keyframes_draw.cc
+  keyframes_edit.cc
+  keyframes_general.cc
+  keyframes_keylist.cc
+  keyframing.cc
+  keyingsets.cc
+  time_scrub_ui.cc
 
-  anim_intern.h
+  anim_intern.hh
 )
 
 set(LIB
   bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::animrig
+  PRIVATE bf::blenlib
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
 )
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
 
 if(WITH_PYTHON)
   add_definitions(-DWITH_PYTHON)
 endif()
 
-add_definitions(${GL_DEFINITIONS})
-
 blender_add_lib(bf_editor_animation "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_animation bf_rna)
+
+if(WITH_GTESTS)
+  set(TEST_SRC
+    anim_filter_test.cc
+    keyframes_keylist_test.cc
+  )
+  set(TEST_INC
+  )
+  set(TEST_LIB
+  )
+  blender_add_test_suite_lib(editor_animation "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+endif()

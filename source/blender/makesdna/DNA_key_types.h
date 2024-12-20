@@ -1,23 +1,7 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
-#ifndef __DNA_KEY_TYPES_H__
-#define __DNA_KEY_TYPES_H__
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+#pragma once
 
 /** \file
  * \ingroup DNA
@@ -43,10 +27,10 @@ typedef struct KeyBlock {
    * so this value increments by 0.1f per frame.
    */
   float pos;
-  /** influence (typically [0 - 1] but can be more), (Key->type == KEY_RELATIVE) only.*/
+  /** influence (typically [0 - 1] but can be more), `(Key->type == KEY_RELATIVE)` only. */
   float curval;
 
-  /** interpolation type (Key->type == KEY_NORMAL) only. */
+  /** Interpolation type `(Key->type == KEY_NORMAL)` only. */
   short type;
   char _pad1[2];
 
@@ -59,7 +43,7 @@ typedef struct KeyBlock {
   /** for meshes only, match the unique number with the customdata layer */
   int uid;
 
-  /** array of shape key values, size is (Key->elemsize * KeyBlock->totelem) */
+  /** array of shape key values, size is `(Key->elemsize * KeyBlock->totelem)` */
   void *data;
   /** MAX_NAME (unique name, user assigned) */
   char name[64];
@@ -78,7 +62,7 @@ typedef struct Key {
   struct AnimData *adt;
 
   /**
-   * commonly called 'Basis', (Key->type == KEY_RELATIVE) only.
+   * commonly called 'Basis', `(Key->type == KEY_RELATIVE)` only.
    * Looks like this is  _always_ 'key->block.first',
    * perhaps later on it could be defined as some other KeyBlock - campbell
    */
@@ -108,7 +92,7 @@ typedef struct Key {
   char _pad2;
 
   /** Only used when (Key->type == KEY_NORMAL), this value is used as a time slider,
-   * rather then using the scenes time, this value can be animated to give greater control */
+   * rather than using the scene's time, this value can be animated to give greater control */
   float ctime;
 
   /**
@@ -147,6 +131,7 @@ enum {
   KEYBLOCK_MUTE = (1 << 0),
   KEYBLOCK_SEL = (1 << 1),
   KEYBLOCK_LOCKED = (1 << 2),
+  KEYBLOCK_LOCKED_SHAPE = (1 << 3),
 };
 
 #define KEYELEM_FLOAT_LEN_COORD 3
@@ -159,5 +144,3 @@ enum {
 
 #define KEYELEM_ELEM_LEN_BEZTRIPLE 4
 #define KEYELEM_FLOAT_LEN_BEZTRIPLE (KEYELEM_ELEM_LEN_BEZTRIPLE * KEYELEM_ELEM_SIZE_CURVE)
-
-#endif /* __DNA_KEY_TYPES_H__  */

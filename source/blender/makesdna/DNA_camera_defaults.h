@@ -1,27 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_CAMERA_DEFAULTS_H__
-#define __DNA_CAMERA_DEFAULTS_H__
+#pragma once
 
-/* Struct members on own line. */
 /* clang-format off */
 
 /* -------------------------------------------------------------------- */
@@ -38,7 +24,7 @@
 #define _DNA_DEFAULT_CameraStereoSettings \
   { \
     .interocular_distance = 0.065f, \
-    .convergence_distance = 30.f * 0.065f, \
+    .convergence_distance = 30.0f * 0.065f, \
     .pole_merge_angle_from = DEG2RADF(60.0f), \
     .pole_merge_angle_to = DEG2RADF(75.0f), \
   }
@@ -55,6 +41,25 @@
     .flag = CAM_SHOWPASSEPARTOUT, \
     .passepartalpha = 0.5f, \
  \
+    .panorama_type = CAM_PANORAMA_FISHEYE_EQUISOLID,\
+    .fisheye_fov = M_PI,\
+    .fisheye_lens = 10.5f,\
+    .latitude_min = -0.5f * (float)M_PI,\
+    .latitude_max = 0.5f * (float)M_PI,\
+    .longitude_min = -M_PI,\
+    .longitude_max = M_PI,\
+    /* Fit to match default projective camera with focal_length 50 and sensor_width 36. */ \
+    .fisheye_polynomial_k0 = -1.1735143712967577e-05f,\
+    .fisheye_polynomial_k1 = -0.019988736953434998f,\
+    .fisheye_polynomial_k2 = -3.3525322965709175e-06f,\
+    .fisheye_polynomial_k3 = 3.099275275886036e-06f,\
+    .fisheye_polynomial_k4 = -2.6064646454854524e-08f,\
+    .central_cylindrical_range_u_min = DEG2RADF(-180.0f),\
+    .central_cylindrical_range_u_max = DEG2RADF(180.0f),\
+    .central_cylindrical_range_v_min = -1.0f,\
+    .central_cylindrical_range_v_max = 1.0f,\
+    .central_cylindrical_radius = 1.0f,\
+ \
     .dof = _DNA_DEFAULT_CameraDOFSettings, \
  \
     .stereo = _DNA_DEFAULT_CameraStereoSettings, \
@@ -63,5 +68,3 @@
 /** \} */
 
 /* clang-format on */
-
-#endif /* __DNA_CAMERA_DEFAULTS_H__ */

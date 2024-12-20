@@ -1,28 +1,19 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
  * \ingroup balembic
  */
+#include <string>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_vector.hh"
 
+#include "DEG_depsgraph.hh"
+
+struct CacheArchiveHandle;
+struct CacheFileLayer;
 struct CacheReader;
 struct ListBase;
 struct Main;
@@ -30,8 +21,6 @@ struct Mesh;
 struct Object;
 struct Scene;
 struct bContext;
-
-typedef struct AbcArchiveHandle AbcArchiveHandle;
 
 int ABC_get_version(void);
 
@@ -49,17 +38,20 @@ struct AlembicExportParams {
   bool uvs;
   bool normals;
   bool vcolors;
+  bool orcos;
   bool apply_subdiv;
   bool curves_as_mesh;
   bool flatten_hierarchy;
   bool visible_objects_only;
-  bool renderable_only;
   bool face_sets;
   bool use_subdiv_schema;
   bool packuv;
   bool triangulate;
   bool export_hair;
   bool export_particles;
+  bool export_custom_properties;
+  bool use_instancing;
+  enum eEvaluationMode evaluation_mode;
 
   /* See MOD_TRIANGULATE_NGON_xxx and MOD_TRIANGULATE_QUAD_xxx
    * in DNA_modifier_types.h */
@@ -67,6 +59,33 @@ struct AlembicExportParams {
   int ngon_method;
 
   float global_scale;
+
+  char collection[MAX_IDPROP_NAME] = "";
+};
+
+struct AlembicImportParams {
+  /* Multiplier for the cached data scale. Mostly useful if the data is stored in a different unit
+   * as what Blender expects (e.g. centimeters instead of meters). */
+  float global_scale;
+
+  blender::Vector<std::string> paths;
+
+  /* Last frame number of consecutive files to expect if the cached animation is split in a
+   * sequence. */
+  int sequence_max_frame;
+  /* Start frame of the sequence, offset from 0. */
+  int sequence_min_frame;
+  /* True if the cache is split in multiple files. */
+  bool is_sequence;
+
+  /* True if the importer should set the current scene's start and end frame based on the start and
+   * end frames of the cached animation. */
+  bool set_frame_range;
+  /* True if imported meshes should be validated. Error messages are sent to the console. */
+  bool validate_meshes;
+  /* True if a cache reader should be added regardless of whether there is animated data in the
+   * cached file. */
+  bool always_add_cache_reader;
 };
 
 /* The ABC_export and ABC_import functions both take a as_background_job
@@ -86,48 +105,51 @@ bool ABC_export(struct Scene *scene,
                 bool as_background_job);
 
 bool ABC_import(struct bContext *C,
-                const char *filepath,
-                float scale,
-                bool is_sequence,
-                bool set_frame_range,
-                int sequence_len,
-                int offset,
-                bool validate_meshes,
+                const struct AlembicImportParams *params,
                 bool as_background_job);
 
-AbcArchiveHandle *ABC_create_handle(struct Main *bmain,
-                                    const char *filename,
-                                    struct ListBase *object_paths);
+struct CacheArchiveHandle *ABC_create_handle(const struct Main *bmain,
+                                             const char *filepath,
+                                             const struct CacheFileLayer *layers,
+                                             struct ListBase *object_paths);
 
-void ABC_free_handle(AbcArchiveHandle *handle);
+void ABC_free_handle(struct CacheArchiveHandle *handle);
 
 void ABC_get_transform(struct CacheReader *reader,
                        float r_mat_world[4][4],
-                       float time,
+                       double time,
                        float scale);
 
-/* Either modifies current_mesh in-place or constructs a new mesh. */
-struct Mesh *ABC_read_mesh(struct CacheReader *reader,
-                           struct Object *ob,
-                           struct Mesh *current_mesh,
-                           const float time,
-                           const char **err_str,
-                           int flags);
+typedef struct ABCReadParams {
+  double time;
+  int read_flags;
+  const char *velocity_name;
+  float velocity_scale;
+} ABCReadParams;
+
+#ifdef __cplusplus
+namespace blender::bke {
+struct GeometrySet;
+}
+
+/* Either modifies the existing geometry component, or create a new one. */
+void ABC_read_geometry(CacheReader *reader,
+                       Object *ob,
+                       blender::bke::GeometrySet &geometry_set,
+                       const ABCReadParams *params,
+                       const char **r_err_str);
+#endif
 
 bool ABC_mesh_topology_changed(struct CacheReader *reader,
                                struct Object *ob,
-                               struct Mesh *existing_mesh,
-                               const float time,
-                               const char **err_str);
+                               const struct Mesh *existing_mesh,
+                               double time,
+                               const char **r_err_str);
 
-void CacheReader_incref(struct CacheReader *reader);
-void CacheReader_free(struct CacheReader *reader);
+void ABC_CacheReader_free(struct CacheReader *reader);
 
-struct CacheReader *CacheReader_open_alembic_object(struct AbcArchiveHandle *handle,
+struct CacheReader *CacheReader_open_alembic_object(struct CacheArchiveHandle *handle,
                                                     struct CacheReader *reader,
                                                     struct Object *object,
-                                                    const char *object_path);
-
-#ifdef __cplusplus
-}
-#endif
+                                                    const char *object_path,
+                                                    bool is_sequence);

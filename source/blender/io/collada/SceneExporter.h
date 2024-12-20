@@ -1,25 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
  */
 
-#ifndef __SCENEEXPORTER_H__
-#define __SCENEEXPORTER_H__
+#pragma once
 
 #include <math.h>
 #include <stdio.h>
@@ -34,7 +21,6 @@
 #include "DNA_image_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -42,10 +28,10 @@
 #include "DNA_userdef_types.h"
 
 #include "BKE_constraint.h"
-#include "BKE_fcurve.h"
+#include "BKE_fcurve.hh"
 #include "BLI_fileops.h"
-#include "BLI_path_util.h"
-#include "ED_keyframing.h"
+#include "BLI_path_utils.hh"
+#include "ED_keyframing.hh"
 
 #include "COLLADASWAsset.h"
 #include "COLLADASWBaseInputElement.h"
@@ -81,8 +67,6 @@
 #include "ArmatureExporter.h"
 #include "ExportSettings.h"
 
-extern void bc_get_children(std::vector<Object *> &child_set, Object *ob, ViewLayer *view_layer);
-
 class SceneExporter : COLLADASW::LibraryVisualScenes,
                       protected TransformWriter,
                       protected InstanceWriter {
@@ -110,5 +94,3 @@ class SceneExporter : COLLADASW::LibraryVisualScenes,
   void writeNodeList(std::vector<Object *> &child_objects, Object *parent);
   void writeNode(Object *ob);
 };
-
-#endif

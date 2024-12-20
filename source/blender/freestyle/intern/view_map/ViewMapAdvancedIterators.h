@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_VIEW_MAP_ADVANCED_ITERATORS_H__
-#define __FREESTYLE_VIEW_MAP_ADVANCED_ITERATORS_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -107,9 +94,7 @@ class edge_iterator_base : public IteratorBase<Traits, InputIteratorTag_Traits> 
   typedef IteratorBase<Traits, InputIteratorTag_Traits> parent_class;
 
  public:
-  inline edge_iterator_base() : parent_class()
-  {
-  }
+  inline edge_iterator_base() : parent_class() {}
 
   inline edge_iterator_base(Nature::VertexNature iNature) : parent_class()
   {
@@ -162,9 +147,7 @@ class edge_iterator_base : public IteratorBase<Traits, InputIteratorTag_Traits> 
     }
   }
 
-  virtual ~edge_iterator_base()
-  {
-  }
+  virtual ~edge_iterator_base() {}
 
   // protected://FIXME
  public:
@@ -364,9 +347,9 @@ class edge_iterator_base : public IteratorBase<Traits, InputIteratorTag_Traits> 
 
 namespace ViewEdgeInternal {
 
-/*!----------------------*/
-/*! Iterators definition */
-/*!----------------------*/
+/**----------------------*/
+/** Iterators definition */
+/**----------------------*/
 template<class Traits>
 class edge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag_Traits> {
  public:
@@ -423,9 +406,7 @@ class edge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag_
     return new edge_iterator_base(*this);
   }
 
-  virtual ~edge_iterator_base()
-  {
-  }
+  virtual ~edge_iterator_base() {}
 
  public:
   virtual bool orientation()
@@ -499,7 +480,7 @@ class edge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag_
   // dereferencing
   virtual reference operator*() const
   {
-    return (_ViewEdge);
+    return _ViewEdge;
   }
 
   virtual pointer operator->() const
@@ -519,12 +500,8 @@ class edge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag_
   }
 
  protected:
-  virtual void increment()
-  {
-  }
-  virtual void decrement()
-  {
-  }
+  virtual void increment() {}
+  virtual void decrement() {}
 };
 
 template<class Traits>
@@ -546,9 +523,7 @@ class fedge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag
   friend class ViewEdge;
   friend class fedge_iterator;
 
-  inline fedge_iterator_base() : parent_class()
-  {
-  }
+  inline fedge_iterator_base() : parent_class() {}
 
   inline fedge_iterator_base(const fedge_iterator_base<Nonconst_traits<FEdge *>> &iBrother)
       : parent_class()
@@ -576,9 +551,7 @@ class fedge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag
   }
 
  public:
-  virtual ~fedge_iterator_base()
-  {
-  }
+  virtual ~fedge_iterator_base() {}
 
   // operators
   // operator corresponding to ++i.
@@ -627,7 +600,7 @@ class fedge_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTag
   // dereferencing
   virtual reference operator*() const
   {
-    return (_FEdge);
+    return _FEdge;
   }
 
   virtual pointer operator->() const
@@ -683,9 +656,7 @@ class vertex_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTa
   friend class ViewEdge;
   friend class vertex_iterator;
 
-  inline vertex_iterator_base() : parent_class()
-  {
-  }
+  inline vertex_iterator_base() : parent_class() {}
 
   inline vertex_iterator_base(const vertex_iterator_base<Const_traits<SVertex *>> &iBrother)
       : parent_class()
@@ -714,9 +685,7 @@ class vertex_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTa
   }
 
  public:
-  virtual ~vertex_iterator_base()
-  {
-  }
+  virtual ~vertex_iterator_base() {}
 
   virtual bool begin() const
   {
@@ -775,7 +744,7 @@ class vertex_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTa
   // dereferencing
   virtual reference operator*() const
   {
-    return (_SVertex);
+    return _SVertex;
   }
 
   virtual pointer operator->() const
@@ -787,7 +756,7 @@ class vertex_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTa
   virtual void increment()
   {
     if (!_NextFEdge) {
-      _SVertex = NULL;
+      _SVertex = nullptr;
       return;
     }
     _SVertex = _NextFEdge->vertexB();
@@ -804,7 +773,7 @@ class vertex_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTa
     }
 #endif
     if (!_PreviousFEdge) {
-      _SVertex = NULL;
+      _SVertex = nullptr;
       return;
     }
     _SVertex = _PreviousFEdge->vertexA();
@@ -816,5 +785,3 @@ class vertex_iterator_base : public IteratorBase<Traits, BidirectionalIteratorTa
 }  // end of namespace ViewEdgeInternal
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_VIEW_MAP_ADVANCED_ITERATORS_H__

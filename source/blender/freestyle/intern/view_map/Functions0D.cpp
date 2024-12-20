@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -22,13 +10,13 @@
 #include "Functions0D.h"
 #include "ViewMap.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 using namespace std;
 
-namespace Freestyle {
-
-namespace Functions0D {
+namespace Freestyle::Functions0D {
 
 // Internal function
 FEdge *getFEdge(Interface0D &it1, Interface0D &it2)
@@ -47,7 +35,7 @@ void getFEdges(Interface0DIterator &it, FEdge *&fe1, FEdge *&fe2)
   }
   if (count < 3) {
     // if we only have 2 vertices
-    FEdge *fe = 0;
+    FEdge *fe = nullptr;
     Interface0DIterator tmp = it;
     if (it.isBegin()) {
       ++tmp;
@@ -58,7 +46,7 @@ void getFEdges(Interface0DIterator &it, FEdge *&fe1, FEdge *&fe2)
       fe = it->getFEdge(*tmp);
     }
     fe1 = fe;
-    fe2 = NULL;
+    fe2 = nullptr;
   }
   else {
     // we have more than 2 vertices
@@ -77,11 +65,11 @@ void getFEdges(Interface0DIterator &it, FEdge *&fe1, FEdge *&fe2)
     }
     if (begin) {
       fe1 = it->getFEdge(*next);
-      fe2 = NULL;
+      fe2 = nullptr;
     }
     else if (last) {
       fe1 = previous->getFEdge(*it);
-      fe2 = NULL;
+      fe2 = nullptr;
     }
     else {
       fe1 = previous->getFEdge(*it);
@@ -95,14 +83,14 @@ void getViewEdges(Interface0DIterator &it, ViewEdge *&ve1, ViewEdge *&ve2)
   FEdge *fe1, *fe2;
   getFEdges(it, fe1, fe2);
   ve1 = fe1->viewedge();
-  if (fe2 != NULL) {
+  if (fe2 != nullptr) {
     ve2 = fe2->viewedge();
     if (ve2 == ve1) {
-      ve2 = NULL;
+      ve2 = nullptr;
     }
   }
   else {
-    ve2 = NULL;
+    ve2 = nullptr;
   }
 }
 
@@ -121,14 +109,14 @@ void getOccludersF0D(Interface0DIterator &it, set<ViewShape *> &oOccluders)
   occluder_container::const_iterator oitend = ve1->occluders_end();
 
   for (; oit != oitend; ++oit) {
-    oOccluders.insert((*oit));
+    oOccluders.insert(*oit);
   }
 
-  if (ve2 != NULL) {
+  if (ve2 != nullptr) {
     oit = ve2->occluders_begin();
     oitend = ve2->occluders_end();
     for (; oit != oitend; ++oit) {
-      oOccluders.insert((*oit));
+      oOccluders.insert(*oit);
     }
   }
 }
@@ -218,12 +206,12 @@ int Curvature2DAngleF0D::operator()(Interface0DIterator &iter)
 {
   Interface0DIterator tmp1 = iter, tmp2 = iter;
   ++tmp2;
-  unsigned count = 1;
-  while ((!tmp1.isBegin()) && (count < 3)) {
+  uint count = 1;
+  while (!tmp1.isBegin() && (count < 3)) {
     --tmp1;
     ++count;
   }
-  while ((!tmp2.isEnd()) && (count < 3)) {
+  while (!tmp2.isEnd() && (count < 3)) {
     ++tmp2;
     ++count;
   }
@@ -280,7 +268,7 @@ int ZDiscontinuityF0D::operator()(Interface0DIterator &iter)
   FEdge *fe1, *fe2;
   getFEdges(iter, fe1, fe2);
   result = fe1->z_discontinuity();
-  if (fe2 != NULL) {
+  if (fe2 != nullptr) {
     result += fe2->z_discontinuity();
     result /= 2.0f;
   }
@@ -294,7 +282,7 @@ int Normal2DF0D::operator()(Interface0DIterator &iter)
   Vec3f e1(fe1->orientation2d());
   Vec2f n1(e1[1], -e1[0]);
   Vec2f n(n1);
-  if (fe2 != NULL) {
+  if (fe2 != nullptr) {
     Vec3f e2(fe2->orientation2d());
     Vec2f n2(e2[1], -e2[0]);
     n += n2;
@@ -308,7 +296,7 @@ int MaterialF0D::operator()(Interface0DIterator &iter)
 {
   FEdge *fe1, *fe2;
   getFEdges(iter, fe1, fe2);
-  if (fe1 == NULL) {
+  if (fe1 == nullptr) {
     return -1;
   }
   if (fe1->isSmooth()) {
@@ -335,9 +323,9 @@ int QuantitativeInvisibilityF0D::operator()(Interface0DIterator &iter)
 {
   ViewEdge *ve1, *ve2;
   getViewEdges(iter, ve1, ve2);
-  unsigned int qi1, qi2;
+  uint qi1, qi2;
   qi1 = ve1->qi();
-  if (ve2 != NULL) {
+  if (ve2 != nullptr) {
     qi2 = ve2->qi();
     if (qi2 != qi1) {
       if (G.debug & G_DEBUG_FREESTYLE) {
@@ -356,7 +344,7 @@ int CurveNatureF0D::operator()(Interface0DIterator &iter)
   ViewEdge *ve1, *ve2;
   getViewEdges(iter, ve1, ve2);
   nat |= ve1->getNature();
-  if (ve2 != NULL) {
+  if (ve2 != nullptr) {
     nat |= ve2->getNature();
   }
   result = nat;
@@ -370,8 +358,9 @@ int GetOccludersF0D::operator()(Interface0DIterator &iter)
   result.clear();
   // vsOccluders.insert(vsOccluders.begin(), occluders.begin(), occluders.end());
   for (set<ViewShape *>::iterator it = occluders.begin(), itend = occluders.end(); it != itend;
-       ++it) {
-    result.push_back((*it));
+       ++it)
+  {
+    result.push_back(*it);
   }
   return 0;
 }
@@ -388,6 +377,4 @@ int GetOccludeeF0D::operator()(Interface0DIterator &iter)
   return 0;
 }
 
-}  // end of namespace Functions0D
-
-} /* namespace Freestyle */
+}  // namespace Freestyle::Functions0D

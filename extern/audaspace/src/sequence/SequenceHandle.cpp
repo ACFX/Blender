@@ -22,6 +22,7 @@
 #include <mutex>
 
 #define KEEP_TIME 10
+#define POSITION_EPSILON (1.0 / static_cast<double>(RATE_48000))
 
 AUD_NAMESPACE_BEGIN
 
@@ -64,7 +65,7 @@ bool SequenceHandle::updatePosition(double position)
 	if(m_handle.get())
 	{
 		// we currently have a handle, let's check where we are
-		if(position >= m_entry->m_end)
+		if(position - POSITION_EPSILON >= m_entry->m_end)
 		{
 			if(position >= m_entry->m_end + KEEP_TIME)
 				// far end, stopping
@@ -76,7 +77,7 @@ bool SequenceHandle::updatePosition(double position)
 				return true;
 			}
 		}
-		else if(position >= m_entry->m_begin)
+		else if(position + POSITION_EPSILON >= m_entry->m_begin)
 		{
 			// inside, resuming
 			m_handle->resume();
@@ -98,7 +99,7 @@ bool SequenceHandle::updatePosition(double position)
 	else
 	{
 		// we don't have a handle, let's start if we should be playing
-		if(position >= m_entry->m_begin && position <= m_entry->m_end)
+		if(position + POSITION_EPSILON >= m_entry->m_begin && position - POSITION_EPSILON <= m_entry->m_end)
 		{
 			start();
 			return m_valid;
@@ -240,10 +241,38 @@ bool SequenceHandle::seek(double position)
 		return false;
 
 	std::lock_guard<ILockable> lock(*m_entry);
-	double seekpos = position - m_entry->m_begin;
-	if(seekpos < 0)
-		seekpos = 0;
-	seekpos += m_entry->m_skip;
+
+	double seek_frame = (position - m_entry->m_begin) * m_entry->m_sequence_data->getFPS();
+
+	if(seek_frame < 0)
+		seek_frame = 0;
+
+	seek_frame += m_entry->m_skip * m_entry->m_sequence_data->getFPS();
+
+	AnimateableProperty* pitch_property = m_entry->getAnimProperty(AP_PITCH);
+
+	double target_frame = 0;
+
+	if(pitch_property != nullptr)
+	{
+		int frame_start = (m_entry->m_begin - m_entry->m_skip) * m_entry->m_sequence_data->getFPS();
+
+		for(int i = 0; seek_frame > 0; i++)
+		{
+			float pitch;
+			pitch_property->read(frame_start + i, &pitch);
+			const double factor = seek_frame > 1.0 ? 1.0 : seek_frame;
+			target_frame += pitch * factor;
+			seek_frame--;
+		}
+	}
+	else
+	{
+		target_frame = seek_frame;
+	}
+
+	double seekpos = target_frame / m_entry->m_sequence_data->getFPS();
+
 	m_handle->setPitch(1.0f);
 	m_handle->seek(seekpos);
 

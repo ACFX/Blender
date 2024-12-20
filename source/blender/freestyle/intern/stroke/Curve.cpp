@@ -1,31 +1,19 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
  * \brief Class to define a container for curves
  */
 
-#include <stdio.h> /* printf */
+#include <cstdio> /* printf */
 
 #include "Curve.h"
 #include "CurveAdvancedIterators.h"
 #include "CurveIterators.h"
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 #include "BLI_utildefines.h"
 
 namespace Freestyle {
@@ -40,8 +28,8 @@ namespace Freestyle {
 
 CurvePoint::CurvePoint()
 {
-  __A = 0;
-  __B = 0;
+  __A = nullptr;
+  __B = nullptr;
   _t2d = 0;
 }
 
@@ -50,11 +38,11 @@ CurvePoint::CurvePoint(SVertex *iA, SVertex *iB, float t)
   __A = iA;
   __B = iB;
   _t2d = t;
-  if ((iA == 0) && (t == 1.0f)) {
+  if ((iA == nullptr) && (t == 1.0f)) {
     _Point2d = __B->point2d();
     _Point3d = __B->point3d();
   }
-  else if ((iB == 0) && (t == 0.0f)) {
+  else if ((iB == nullptr) && (t == 0.0f)) {
     _Point2d = __A->point2d();
     _Point3d = __A->point3d();
   }
@@ -66,17 +54,18 @@ CurvePoint::CurvePoint(SVertex *iA, SVertex *iB, float t)
 
 CurvePoint::CurvePoint(CurvePoint *iA, CurvePoint *iB, float t3)
 {
-  __A = 0;
-  __B = 0;
+  __A = nullptr;
+  __B = nullptr;
   float t1 = iA->t2d();
   float t2 = iB->t2d();
-  if ((iA->A() == iB->A()) && (iA->B() == iB->B()) && (iA->A() != 0) && (iA->B() != 0) &&
-      (iB->A() != 0) && (iB->B() != 0)) {
+  if ((iA->A() == iB->A()) && (iA->B() == iB->B()) && (iA->A() != nullptr) &&
+      (iA->B() != nullptr) && (iB->A() != nullptr) && (iB->B() != nullptr))
+  {
     __A = iA->A();
     __B = iB->B();
     _t2d = t1 + t2 * t3 - t1 * t3;
   }
-  else if ((iA->B() == 0) && (iB->B() == 0)) {
+  else if ((iA->B() == nullptr) && (iB->B() == nullptr)) {
     __A = iA->A();
     __B = iB->A();
     _t2d = t3;
@@ -133,16 +122,19 @@ CurvePoint::CurvePoint(CurvePoint *iA, CurvePoint *iB, float t3)
       _t2d = t2 * t3;
     }
   }
-  else if (iA->A() != 0 && iB->A() != 0 &&
-           (iA->A()->point3d() - iB->A()->point3d()).norm() < 1.0e-6) {
+  else if (iA->A() != nullptr && iB->A() != nullptr &&
+           (iA->A()->point3d() - iB->A()->point3d()).norm() < 1.0e-6)
+  {
     goto iA_A_eq_iB_A;
   }
-  else if (iA->B() != 0 && iB->B() != 0 &&
-           (iA->B()->point3d() - iB->B()->point3d()).norm() < 1.0e-6) {
+  else if (iA->B() != nullptr && iB->B() != nullptr &&
+           (iA->B()->point3d() - iB->B()->point3d()).norm() < 1.0e-6)
+  {
     goto iA_B_eq_iB_B;
   }
-  else if (iA->B() != 0 && iB->A() != 0 &&
-           (iA->B()->point3d() - iB->A()->point3d()).norm() < 1.0e-6) {
+  else if (iA->B() != nullptr && iB->A() != nullptr &&
+           (iA->B()->point3d() - iB->A()->point3d()).norm() < 1.0e-6)
+  {
     goto iA_B_eq_iB_A;
   }
 
@@ -162,7 +154,7 @@ CurvePoint::CurvePoint(CurvePoint *iA, CurvePoint *iB, float t3)
     cerr << "Fatal error in CurvePoint::CurvePoint(CurvePoint *iA, CurvePoint *iB, float t3)"
          << endl;
   }
-  BLI_assert(__A != 0 && __B != 0);
+  BLI_assert(__A != nullptr && __B != nullptr);
 
 #if 0
   _Point2d = __A->point2d() + _t2d * (__B->point2d() - __A->point2d());
@@ -195,7 +187,7 @@ CurvePoint &CurvePoint::operator=(const CurvePoint &iBrother)
 FEdge *CurvePoint::fedge()
 {
   if (getNature() & Nature::T_VERTEX) {
-    return 0;
+    return nullptr;
   }
   return __A->fedge();
 }
@@ -206,28 +198,29 @@ FEdge *CurvePoint::getFEdge(Interface0D &inter)
   if (!iVertexB) {
     cerr << "Warning: CurvePoint::getFEdge() failed to cast the given 0D element to CurvePoint."
          << endl;
-    return 0;
+    return nullptr;
   }
   if (((__A == iVertexB->__A) && (__B == iVertexB->__B)) ||
-      ((__A == iVertexB->__B) && (__B == iVertexB->__A))) {
+      ((__A == iVertexB->__B) && (__B == iVertexB->__A)))
+  {
     return __A->getFEdge(*__B);
   }
-  if (__B == 0) {
-    if (iVertexB->__B == 0) {
+  if (__B == nullptr) {
+    if (iVertexB->__B == nullptr) {
       return __A->getFEdge(*(iVertexB->__A));
     }
-    else if (iVertexB->__A == __A) {
+    if (iVertexB->__A == __A) {
       return __A->getFEdge(*(iVertexB->__B));
     }
-    else if (iVertexB->__B == __A) {
+    if (iVertexB->__B == __A) {
       return __A->getFEdge(*(iVertexB->__A));
     }
   }
-  if (iVertexB->__B == 0) {
+  if (iVertexB->__B == nullptr) {
     if (iVertexB->__A == __A) {
       return __B->getFEdge(*(iVertexB->__A));
     }
-    else if (iVertexB->__A == __B) {
+    if (iVertexB->__A == __B) {
       return __A->getFEdge(*(iVertexB->__A));
     }
   }
@@ -284,15 +277,15 @@ FEdge *CurvePoint::getFEdge(Interface0D &inter)
 #endif
   cerr << "Warning: CurvePoint::getFEdge() failed." << endl;
 
-  return NULL;
+  return nullptr;
 }
 
 Vec3r CurvePoint::normal() const
 {
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->normal();
   }
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->normal();
   }
   Vec3r Na = __A->normal();
@@ -328,7 +321,7 @@ Id CurvePoint::shape_id() const
 
 const SShape *CurvePoint::shape() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->shape();
   }
   return __A->shape();
@@ -343,7 +336,7 @@ float CurvePoint::shape_importance() const
   return __A->shape_importance();
 }
 
-const unsigned CurvePoint::qi() const
+const uint CurvePoint::qi() const
 {
   if (__A == 0) {
     return __B->qi();
@@ -357,10 +350,10 @@ const unsigned CurvePoint::qi() const
 
 occluder_container::const_iterator CurvePoint::occluders_begin() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occluders_begin();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occluders_begin();
   }
   return __A->getFEdge(*__B)->occluders_begin();
@@ -368,10 +361,10 @@ occluder_container::const_iterator CurvePoint::occluders_begin() const
 
 occluder_container::const_iterator CurvePoint::occluders_end() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occluders_end();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occluders_end();
   }
   return __A->getFEdge(*__B)->occluders_end();
@@ -379,10 +372,10 @@ occluder_container::const_iterator CurvePoint::occluders_end() const
 
 bool CurvePoint::occluders_empty() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occluders_empty();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occluders_empty();
   }
   return __A->getFEdge(*__B)->occluders_empty();
@@ -390,10 +383,10 @@ bool CurvePoint::occluders_empty() const
 
 int CurvePoint::occluders_size() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occluders_size();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occluders_size();
   }
   return __A->getFEdge(*__B)->occluders_size();
@@ -401,10 +394,10 @@ int CurvePoint::occluders_size() const
 
 const SShape *CurvePoint::occluded_shape() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occluded_shape();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occluded_shape();
   }
   return __A->getFEdge(*__B)->occluded_shape();
@@ -412,21 +405,21 @@ const SShape *CurvePoint::occluded_shape() const
 
 const Polygon3r &CurvePoint::occludee() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occludee();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occludee();
   }
   return __A->getFEdge(*__B)->occludee();
 }
 
-const bool CurvePoint::occludee_empty() const
+bool CurvePoint::occludee_empty() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->occludee_empty();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->occludee_empty();
   }
   return __A->getFEdge(*__B)->occludee_empty();
@@ -434,13 +427,13 @@ const bool CurvePoint::occludee_empty() const
 
 real CurvePoint::z_discontinuity() const
 {
-  if (__A == 0) {
+  if (__A == nullptr) {
     return __B->z_discontinuity();
   }
-  if (__B == 0) {
+  if (__B == nullptr) {
     return __A->z_discontinuity();
   }
-  if (__A->getFEdge(*__B) == 0) {
+  if (__A->getFEdge(*__B) == nullptr) {
     return 0.0;
   }
 
@@ -460,7 +453,7 @@ float CurvePoint::local_depth_variance() const
 
 real CurvePoint::local_average_density(float sigma) const
 {
-  //return local_average_density<CurvePoint >(this);
+  // return local_average_density<CurvePoint >(this);
   return density_function<CurvePoint>(this);
 }
 
@@ -560,20 +553,21 @@ Vec2d CurvePoint::directionFredo() const
 /*                                */
 /**********************************/
 
-/* for  functions */
+/* for functions */
 
 Curve::~Curve()
 {
   if (!_Vertices.empty()) {
     for (vertex_container::iterator it = _Vertices.begin(), itend = _Vertices.end(); it != itend;
-         ++it) {
+         ++it)
+    {
       delete (*it);
     }
     _Vertices.clear();
   }
 }
 
-/*! iterators access */
+/** iterators access */
 Curve::point_iterator Curve::points_begin(float step)
 {
   vertex_container::iterator second = _Vertices.begin();
@@ -903,7 +897,7 @@ float Curve::local_depth_variance(int iCombination) const
 #  if 0
   local_depth_variance_functor<Point> functor;
   float result;
-  Evaluate<float, local_depth_variance_functor<Point> >(&functor, iCombination, result);
+  Evaluate<float, local_depth_variance_functor<Point>>(&functor, iCombination, result);
   return result;
 #  endif
 }
@@ -914,7 +908,7 @@ real Curve::local_average_density(float sigma, int iCombination) const
 #  if 0
   density_functor<Point> functor;
   real result;
-  Evaluate<real, density_functor<Point> >(&functor, iCombination, result);
+  Evaluate<real, density_functor<Point>>(&functor, iCombination, result);
   return result;
 #  endif
 }
@@ -978,12 +972,12 @@ void Curve::computeCurvatureAndOrientation()
   (*v0)->setCurvatureFredo((*v2)->curvatureFredo());
   (*v0)->setDirectionFredo((*v2)->point2d() - (*v0)->point2d());
 
-  //closed curve case one day...
+  // closed curve case one day...
 
   //
   return;
 
-  //numerical degeneracy verification... we'll see later
+  // numerical degeneracy verification... we'll see later
   const_vertex_iterator vLastReliable = vertices_begin();
 
   v = vertices_begin();
@@ -1016,7 +1010,7 @@ void Curve::computeCurvatureAndOrientation()
       cerr << "/";
     }
     else {
-      if (!isReliable) {  //previous points were not reliable
+      if (!isReliable) {  // previous points were not reliable
         const_vertex_iterator vfix = vLastReliable;
         ++vfix;
         for (; vfix != v; ++vfix) {

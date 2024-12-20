@@ -1,69 +1,56 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2013 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2013, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
   ..
   ../..
   ../../../blenkernel
-  ../../../blenlib
-  ../../../makesdna
-  ../../../../../intern/guardedalloc
   ../../../../../intern/utfconv
 )
 
 set(INC_SYS
-
+  ${OPENIMAGEIO_INCLUDE_DIRS}
 )
 
 set(SRC
   openimageio_api.h
+  openimageio_support.hh
 
   openimageio_api.cpp
+  openimageio_support.cc
 )
 
 set(LIB
+  ${OPENIMAGEIO_LIBRARIES}
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::intern::guardedalloc
 )
 
-if(WITH_OPENIMAGEIO)
+if(WITH_PUGIXML)
+  list(APPEND LIB
+    ${PUGIXML_LIBRARIES}
+  )
+endif()
+
+if(WITH_IMAGE_OPENEXR)
   list(APPEND INC_SYS
-    ${OPENIMAGEIO_INCLUDE_DIRS}
-    ${BOOST_INCLUDE_DIR}
+    ${OPENEXR_INCLUDE_DIRS}
   )
   list(APPEND LIB
-    ${OPENIMAGEIO_LIBRARIES}
+    ${OPENEXR_LIBRARIES}
   )
-  if(WITH_IMAGE_OPENEXR)
+endif()
+
+# Keep until APPLE/ARM libraries are updated.
+if(APPLE OR WIN32)
+  if(CMAKE_OSX_ARCHITECTURES MATCHES arm64 OR CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM64")
     list(APPEND INC_SYS
-      ${OPENEXR_INCLUDE_DIRS}
-    )
-    list(APPEND LIB
-      ${OPENEXR_LIBRARIES}
+      ${IMATH_INCLUDE_DIRS}
     )
   endif()
-
-  list(APPEND LIB
-    ${BOOST_LIBRARIES}
-  )
-
-  add_definitions(-DWITH_OPENIMAGEIO)
 endif()
 
 blender_add_lib(bf_imbuf_openimageio "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

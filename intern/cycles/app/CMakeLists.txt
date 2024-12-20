@@ -1,3 +1,10 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
+
+#####################################################################
+# Cycles standalone executable
+#####################################################################
 
 set(INC
   ..
@@ -5,105 +12,67 @@ set(INC
 set(INC_SYS
 )
 
-# NOTE: LIBRARIES contains all the libraries which are common
-# across release and debug build types, stored in a linking order.
-set(LIBRARIES
+set(LIB
   cycles_device
   cycles_kernel
-  cycles_render
+  cycles_scene
+  cycles_session
   cycles_bvh
   cycles_subd
   cycles_graph
   cycles_util
-  ${BLENDER_GL_LIBRARIES}
-  ${CYCLES_APP_GLEW_LIBRARY}
-  ${PNG_LIBRARIES}
-  ${JPEG_LIBRARIES}
-  ${ZLIB_LIBRARIES}
-  ${TIFF_LIBRARY}
-  ${PTHREADS_LIBRARIES}
 )
 
-if(WITH_CUDA_DYNLOAD)
-  list(APPEND LIBRARIES extern_cuew)
-else()
-  list(APPEND LIBRARIES ${CUDA_CUDA_LIBRARY})
+if(WITH_ALEMBIC)
+  add_definitions(-DWITH_ALEMBIC)
+  list(APPEND INC_SYS
+    ${ALEMBIC_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${ALEMBIC_LIBRARIES}
+  )
 endif()
 
 if(WITH_CYCLES_OSL)
-  list(APPEND LIBRARIES cycles_kernel_osl)
+  list(APPEND LIB cycles_kernel_osl)
 endif()
 
-if(NOT CYCLES_STANDALONE_REPOSITORY)
-  list(APPEND LIBRARIES bf_intern_glew_mx bf_intern_guardedalloc bf_intern_numaapi bf_intern_sky)
-endif()
-
-if(WITH_CYCLES_LOGGING)
-  list(APPEND LIBRARIES
-    ${GLOG_LIBRARIES}
-    ${GFLAGS_LIBRARIES}
-  )
+if(CYCLES_STANDALONE_REPOSITORY)
+  list(APPEND LIB extern_sky)
+else()
+  list(APPEND LIB bf_intern_sky)
 endif()
 
 if(WITH_CYCLES_STANDALONE AND WITH_CYCLES_STANDALONE_GUI)
-  list(APPEND LIBRARIES ${GLUT_LIBRARIES})
+  list(APPEND INC_SYS
+    ${Epoxy_INCLUDE_DIRS}
+    ${SDL2_INCLUDE_DIRS}
+  )
+  list(APPEND LIB ${Epoxy_LIBRARIES} ${SDL2_LIBRARIES})
 endif()
+
+if(WITH_USD)
+  # Silence warning from USD headers using deprecated TBB header.
+  add_definitions(
+    -D__TBB_show_deprecation_message_atomic_H
+    -D__TBB_show_deprecation_message_task_H
+  )
+
+  list(APPEND INC_SYS
+    ${USD_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    cycles_hydra
+    ${USD_LIBRARIES}
+  )
+endif()
+
+cycles_external_libraries_append(LIB)
 
 # Common configuration.
 
-link_directories(
-  ${OPENIMAGEIO_LIBPATH}
-  ${BOOST_LIBPATH}
-  ${PNG_LIBPATH}
-  ${JPEG_LIBPATH}
-  ${ZLIB_LIBPATH}
-  ${TIFF_LIBPATH}
-  ${OPENEXR_LIBPATH}
-  ${OPENJPEG_LIBPATH}
-  ${OPENVDB_LIBPATH}
-)
-
-if(WITH_OPENCOLORIO)
-  link_directories(${OPENCOLORIO_LIBPATH})
-endif()
-
-add_definitions(${GL_DEFINITIONS})
-
 include_directories(${INC})
 include_directories(SYSTEM ${INC_SYS})
-
-# Make sure given target is linked against proper libraries
-# which varies across debug and release build types.
-#
-# This will also make sure dependencies of that libraries
-# are sent to the linker after them.
-#
-# TODO(sergey): Think of a better place for this?
-macro(cycles_target_link_libraries target)
-  target_link_libraries(${target} ${LIBRARIES})
-  if(WITH_CYCLES_OSL)
-    target_link_libraries(${target} ${OSL_LIBRARIES} ${LLVM_LIBRARIES})
-  endif()
-  if(WITH_CYCLES_EMBREE)
-    target_link_libraries(${target} ${EMBREE_LIBRARIES})
-  endif()
-  if(WITH_OPENSUBDIV)
-    target_link_libraries(${target} ${OPENSUBDIV_LIBRARIES})
-  endif()
-  if(WITH_OPENCOLORIO)
-    target_link_libraries(${target} ${OPENCOLORIO_LIBRARIES})
-  endif()
-  target_link_libraries(
-    ${target}
-    ${OPENIMAGEIO_LIBRARIES}
-    ${OPENEXR_LIBRARIES}
-    ${OPENJPEG_LIBRARIES}
-    ${PUGIXML_LIBRARIES}
-    ${BOOST_LIBRARIES}
-    ${CMAKE_DL_LIBS}
-    ${PLATFORM_LINKLIBS}
-  )
-endmacro()
 
 # Application build targets
 
@@ -112,58 +81,69 @@ if(WITH_CYCLES_STANDALONE)
     cycles_standalone.cpp
     cycles_xml.cpp
     cycles_xml.h
+    oiio_output_driver.cpp
+    oiio_output_driver.h
   )
-  add_executable(cycles ${SRC})
-  cycles_target_link_libraries(cycles)
 
-  if(UNIX AND NOT APPLE)
-    set_target_properties(cycles PROPERTIES INSTALL_RPATH $ORIGIN/lib)
+  if(WITH_CYCLES_STANDALONE_GUI)
+    list(APPEND SRC
+      opengl/display_driver.cpp
+      opengl/display_driver.h
+      opengl/shader.cpp
+      opengl/shader.h
+      opengl/window.cpp
+      opengl/window.h
+    )
   endif()
+
+  add_executable(cycles ${SRC} ${INC} ${INC_SYS})
   unset(SRC)
-endif()
 
-if(WITH_CYCLES_NETWORK)
-  set(SRC
-    cycles_server.cpp
-  )
-  add_executable(cycles_server ${SRC})
-  cycles_target_link_libraries(cycles_server)
+  target_link_libraries(cycles PRIVATE ${LIB})
 
-  if(UNIX AND NOT APPLE)
-    set_target_properties(cycles_server PROPERTIES INSTALL_RPATH $ORIGIN/lib)
-  endif()
-  unset(SRC)
-endif()
-
-if(WITH_CYCLES_CUBIN_COMPILER)
-  # 32 bit windows is special, nvrtc is not supported on x86, so even
-  # though we are building 32 bit blender a 64 bit cubin_cc will have
-  # to be build to compile the cubins.
-  if(MSVC AND NOT CMAKE_CL_64)
-    message("Building with CUDA not supported on 32 bit, skipped")
-    set(WITH_CYCLES_CUDA_BINARIES OFF CACHE BOOL "" FORCE)
-  else()
-    set(SRC
-      cycles_cubin_cc.cpp
-    )
-    set(INC
-      ../../../extern/cuew/include
-    )
-    add_executable(cycles_cubin_cc ${SRC})
-    include_directories(${INC})
-    target_link_libraries(cycles_cubin_cc
-      extern_cuew
-      ${OPENIMAGEIO_LIBRARIES}
-      ${OPENEXR_LIBRARIES}
-      ${OPENJPEG_LIBRARIES}
-      ${PUGIXML_LIBRARIES}
-      ${BOOST_LIBRARIES}
-      ${PLATFORM_LINKLIBS}
-    )
-    if(NOT CYCLES_STANDALONE_REPOSITORY)
-      target_link_libraries(cycles_cubin_cc bf_intern_guardedalloc)
+  if(APPLE)
+    if(WITH_CYCLES_STANDALONE_GUI)
+      set_property(TARGET cycles APPEND_STRING PROPERTY LINK_FLAGS
+        " -framework Cocoa -framework CoreAudio -framework AudioUnit -framework AudioToolbox -framework ForceFeedback -framework CoreVideo")
     endif()
-    unset(SRC)
-    unset(INC)
   endif()
+
+  if(CYCLES_STANDALONE_REPOSITORY)
+    cycles_install_libraries(cycles)
+
+    if(WITH_USD AND USD_LIBRARY_DIR)
+      install(DIRECTORY
+        ${USD_LIBRARY_DIR}/usd
+        DESTINATION ${CMAKE_INSTALL_PREFIX}
+      )
+
+      install(DIRECTORY
+        ${USD_LIBRARY_DIR}/../plugin/usd
+        DESTINATION ${CMAKE_INSTALL_PREFIX}
+      )
+    endif()
+  endif()
+
+  install(
+    TARGETS cycles
+    DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+  add_test(
+    NAME cycles_version
+    COMMAND ${CMAKE_INSTALL_PREFIX}/$<TARGET_FILE_NAME:cycles> --version)
+endif()
+
+if(WITH_CYCLES_PRECOMPUTE)
+  set(SRC
+    cycles_precompute.cpp
+  )
+
+  add_executable(cycles_precompute ${SRC} ${INC} ${INC_SYS})
+  unset(SRC)
+
+  target_link_libraries(cycles_precompute PRIVATE ${LIB})
+
+  install(
+    TARGETS cycles_precompute
+    DESTINATION ${CMAKE_INSTALL_PREFIX})
 endif()

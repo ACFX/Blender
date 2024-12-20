@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_CURVE_ITERATORS_H__
-#define __FREESTYLE_CURVE_ITERATORS_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -29,11 +16,11 @@ namespace Freestyle {
 
 namespace CurveInternal {
 
-/*! iterator on a curve. Allows an iterating outside
- *  initial vertices. A CurvePoint is instantiated an returned
- *  when the iterator is dereferenced.
+/**
+ * Iterator on a curve. Allows an iterating outside
+ * initial vertices. A CurvePoint is instantiated an returned
+ * when the iterator is dereferenced.
  */
-
 class CurvePointIterator : public Interface0DIteratorNested {
  public:
   friend class Freestyle::Curve;
@@ -94,9 +81,7 @@ class CurvePointIterator : public Interface0DIteratorNested {
     return *this;
   }
 
-  virtual ~CurvePointIterator()
-  {
-  }
+  virtual ~CurvePointIterator() {}
 
  protected:
   inline CurvePointIterator(Curve::vertex_container::iterator iA,
@@ -303,5 +288,3 @@ class CurvePointIterator : public Interface0DIteratorNested {
 }  // end of namespace CurveInternal
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_CURVE_ITERATORS_H__

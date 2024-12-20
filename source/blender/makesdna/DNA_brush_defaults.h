@@ -1,29 +1,15 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_BRUSH_DEFAULTS_H__
-#define __DNA_BRUSH_DEFAULTS_H__
+#pragma once
 
 #include "DNA_texture_defaults.h"
 
-/* Struct members on own line. */
 /* clang-format off */
 
 /* -------------------------------------------------------------------- */
@@ -38,14 +24,16 @@
  \
     .ob_mode = OB_MODE_ALL_PAINT, \
  \
-    /* BRUSH SCULPT TOOL SETTINGS */ \
+    /* BRUSH SCULPT BRUSH SETTINGS */ \
     .weight = 1.0f, /* weight of brush 0 - 1.0 */ \
     .size = 35,     /* radius of the brush in pixels */ \
+    .unprojected_radius = 0.05f, /* radius of the brush in Blender units */ \
     .alpha = 1.0f,  /* brush strength/intensity probably variable should be renamed? */ \
     .autosmooth_factor = 0.0f, \
     .topology_rake_factor = 0.0f, \
     .crease_pinch_factor = 0.5f, \
     .normal_radius_factor = 0.5f, \
+    .wet_paint_radius_factor = 0.5f, \
     .area_radius_factor = 0.5f, \
     .disconnected_distance_max = 0.1f, \
     .sculpt_plane = SCULPT_DISP_DIR_AREA, \
@@ -60,7 +48,7 @@
     .normal_weight = 0.0f, \
     .fill_threshold = 0.2f, \
  \
-    /* BRUSH PAINT TOOL SETTINGS */ \
+    /* BRUSH PAINT BRUSH SETTINGS */ \
     /* Default rgb color of the brush when painting - white. */ \
     .rgb = {1.0f, 1.0f, 1.0f}, \
  \
@@ -78,6 +66,7 @@
  \
     .jitter = 0.0f, \
  \
+    .input_samples = 1, \
     /* Dash */ \
     .dash_ratio = 1.0f, \
     .dash_samples = 20, \
@@ -88,7 +77,7 @@
     .cursor_overlay_alpha = 33, \
     .overlay_flags = 0, \
  \
-    /* brush appearance  */ \
+    /* Brush appearance. */ \
  \
     /* add mode color is light red */ \
     .add_col = {1.0, 0.39, 0.39, 0.9}, \
@@ -98,23 +87,33 @@
  \
     .stencil_pos = {256, 256}, \
     .stencil_dimension = {256, 256}, \
+    .mask_stencil_pos = {256, 256}, \
+    .mask_stencil_dimension = {256, 256}, \
  \
-    /* sculpting defaults to the draw tool for new brushes */ \
-    .sculpt_tool = SCULPT_TOOL_DRAW, \
+    /* sculpting defaults to the draw brush for new brushes */ \
+    .sculpt_brush_type = SCULPT_BRUSH_TYPE_DRAW, \
     .pose_smooth_iterations = 4, \
     .pose_ik_segments = 1, \
     .hardness = 0.0f, \
-    .automasking_boundary_edges_propagation_steps = 1, \
  \
-    /* A kernel radius of 1 has almost no effect (T63233). */ \
+    .automasking_boundary_edges_propagation_steps = 1, \
+    .automasking_start_normal_limit = 0.34906585f, /* 20 degrees */ \
+    .automasking_start_normal_falloff = 0.25f, \
+    .automasking_view_normal_limit = 1.570796, /* 90 degrees */ \
+    .automasking_view_normal_falloff = 0.25f, \
+    .automasking_cavity_blur_steps = 0,\
+    .automasking_cavity_factor = 1.0f,\
+ \
+    /* A kernel radius of 1 has almost no effect (#63233). */ \
     .blur_kernel_radius = 2, \
  \
     .mtex = _DNA_DEFAULT_MTex, \
     .mask_mtex = _DNA_DEFAULT_MTex, \
+    .falloff_shape = 0,\
+    .tip_scale_x = 1.0f,\
+    .tip_roundness = 1.0f,\
   }
 
 /** \} */
 
 /* clang-format on */
-
-#endif /* __DNA_BRUSH_DEFAULTS_H__ */

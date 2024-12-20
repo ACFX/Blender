@@ -21,9 +21,9 @@
 #include "libmv/image/array_nd.h"
 #include "testing/testing.h"
 
-using libmv::ArrayND;
 using libmv::Array3D;
 using libmv::Array3Df;
+using libmv::ArrayND;
 
 namespace {
 
@@ -100,7 +100,7 @@ TEST(ArrayND, Size) {
   int l[] = {0, 1, 2};
   ArrayND<int, 3>::Index last(l);
 
-  EXPECT_EQ(a.Size(), a.Offset(last)+1);
+  EXPECT_EQ(a.Size(), a.Offset(last) + 1);
   EXPECT_TRUE(a.Contains(last));
   EXPECT_FALSE(a.Contains(shape));
 }
@@ -120,8 +120,8 @@ TEST(ArrayND, Parenthesis) {
   int s[] = {3, 3};
   ArrayND<int, 2> a(s);
 
-  *(a.Data()+0) = 0;
-  *(a.Data()+5) = 5;
+  *(a.Data() + 0) = 0;
+  *(a.Data() + 5) = 5;
 
   int i1[] = {0, 0};
   EXPECT_EQ(0, a(Index(i1)));
@@ -191,10 +191,10 @@ TEST(ArrayND, CopyFrom) {
   a(1, 1, 0) = 4;
   ArrayND<float, 3> b;
   b.CopyFrom(a);
-  EXPECT_FLOAT_EQ(1.f, b(0, 0, 0));
-  EXPECT_FLOAT_EQ(2.f, b(0, 1, 0));
-  EXPECT_FLOAT_EQ(3.f, b(1, 0, 0));
-  EXPECT_FLOAT_EQ(4.f, b(1, 1, 0));
+  EXPECT_FLOAT_EQ(1.0f, b(0, 0, 0));
+  EXPECT_FLOAT_EQ(2.0f, b(0, 1, 0));
+  EXPECT_FLOAT_EQ(3.0f, b(1, 0, 0));
+  EXPECT_FLOAT_EQ(4.0f, b(1, 1, 0));
 }
 
 TEST(ArrayND, MultiplyElements) {
@@ -210,7 +210,7 @@ TEST(ArrayND, MultiplyElements) {
   b(1, 1, 0) = 3;
   ArrayND<int, 3> c;
   MultiplyElements(a, b, &c);
-  EXPECT_FLOAT_EQ(6,  c(0, 0, 0));
+  EXPECT_FLOAT_EQ(6, c(0, 0, 0));
   EXPECT_FLOAT_EQ(10, c(0, 1, 0));
   EXPECT_FLOAT_EQ(12, c(1, 0, 0));
   EXPECT_FLOAT_EQ(12, c(1, 1, 0));
@@ -307,10 +307,10 @@ TEST(ArrayND, MultiplyElementsGeneric) {
   MultiplyElements(A, B, &C);
 
   ArrayND<double, 5>::Index cIndex;
-  for (int d0 = 0; d0 < shape[0]; ++d0)
-    for (int d1 = 0; d1 < shape[1]; ++d1)
-      for (int d2 = 0; d2 < shape[2]; ++d2)
-        for (int d3 = 0; d3 < shape[3]; ++d3)
+  for (int d0 = 0; d0 < shape[0]; ++d0) {
+    for (int d1 = 0; d1 < shape[1]; ++d1) {
+      for (int d2 = 0; d2 < shape[2]; ++d2) {
+        for (int d3 = 0; d3 < shape[3]; ++d3) {
           for (int d4 = 0; d4 < shape[4]; ++d4) {
             cIndex(0) = d0;
             cIndex(1) = d1;
@@ -319,6 +319,10 @@ TEST(ArrayND, MultiplyElementsGeneric) {
             cIndex(4) = d4;
             EXPECT_EQ(2.2, C(cIndex));
           }
+        }
+      }
+    }
+  }
 }
 
 }  // namespace

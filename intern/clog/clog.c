@@ -1,26 +1,15 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2018-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup clog
+ * \ingroup intern_clog
  */
 
 #include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,8 +27,13 @@
 #endif
 
 #if defined(_MSC_VER)
+#  include <Windows.h>
+
+#  include <VersionHelpers.h> /* This needs to be included after Windows.h. */
 #  include <io.h>
-#  include <windows.h>
+#  if !defined(ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+#    define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#  endif
 #endif
 
 /* For printing timestamp. */
@@ -73,13 +67,15 @@ typedef struct CLG_IDFilter {
 } CLG_IDFilter;
 
 typedef struct CLogContext {
-  /** Single linked list of types.  */
+  /** Single linked list of types. */
   CLG_LogType *types;
+  /** Single linked list of references. */
+  CLG_LogRef *refs;
 #ifdef WITH_CLOG_PTHREADS
   pthread_mutex_t types_lock;
 #endif
 
-  /* exclude, include filters.  */
+  /* exclude, include filters. */
   CLG_IDFilter *filters[2];
   bool use_color;
   bool use_basename;
@@ -98,6 +94,7 @@ typedef struct CLogContext {
   } default_type;
 
   struct {
+    void (*error_fn)(void *file_handle);
     void (*fatal_fn)(void *file_handle);
     void (*backtrace_fn)(void *file_handle);
   } callbacks;
@@ -153,7 +150,6 @@ static void clg_str_reserve(CLogStringBuf *cstr, const uint len)
       cstr->data = data;
       cstr->is_alloc = true;
     }
-    cstr->len_alloc = len;
   }
 }
 
@@ -175,31 +171,39 @@ static void clg_str_append(CLogStringBuf *cstr, const char *str)
 }
 
 ATTR_PRINTF_FORMAT(2, 0)
-static void clg_str_vappendf(CLogStringBuf *cstr, const char *fmt, va_list args)
+static void clg_str_vappendf(CLogStringBuf *cstr, const char *format, va_list args)
 {
   /* Use limit because windows may use '-1' for a formatting error. */
   const uint len_max = 65535;
-  uint len_avail = (cstr->len_alloc - cstr->len);
-  if (len_avail == 0) {
-    len_avail = CLOG_BUF_LEN_INIT;
-    clg_str_reserve(cstr, len_avail);
-  }
+  uint len_avail = cstr->len_alloc - cstr->len;
   while (true) {
     va_list args_cpy;
     va_copy(args_cpy, args);
-    int retval = vsnprintf(cstr->data + cstr->len, len_avail, fmt, args_cpy);
+    int retval = vsnprintf(cstr->data + cstr->len, len_avail, format, args_cpy);
     va_end(args_cpy);
-    if (retval != -1) {
-      cstr->len += retval;
+
+    if (retval < 0) {
+      /* Some encoding error happened, not much we can do here, besides skipping/canceling this
+       * message. */
       break;
     }
-    else {
-      len_avail *= 2;
-      if (len_avail >= len_max) {
-        break;
-      }
-      clg_str_reserve(cstr, len_avail);
+
+    if ((uint)retval <= len_avail) {
+      /* Copy was successful. */
+      cstr->len += (uint)retval;
+      break;
     }
+
+    /* `vsnprintf` was not successful, due to lack of allocated space, `retval` contains expected
+     * length of the formatted string, use it to allocate required amount of memory. */
+    uint len_alloc = cstr->len + (uint)retval;
+    if (len_alloc >= len_max) {
+      /* Safe upper-limit, just in case... */
+      break;
+    }
+
+    clg_str_reserve(cstr, len_alloc);
+    len_avail = cstr->len_alloc - cstr->len;
   }
 }
 
@@ -220,6 +224,9 @@ enum eCLogColor {
 #define COLOR_LEN (COLOR_RESET + 1)
 
 static const char *clg_color_table[COLOR_LEN] = {NULL};
+#ifdef _WIN32
+static DWORD clg_previous_console_mode = 0;
+#endif
 
 static void clg_color_table_init(bool use_color)
 {
@@ -227,15 +234,11 @@ static void clg_color_table_init(bool use_color)
     clg_color_table[i] = "";
   }
   if (use_color) {
-#ifdef _WIN32
-    /* TODO */
-#else
     clg_color_table[COLOR_DEFAULT] = "\033[1;37m";
     clg_color_table[COLOR_RED] = "\033[1;31m";
     clg_color_table[COLOR_GREEN] = "\033[1;32m";
     clg_color_table[COLOR_YELLOW] = "\033[1;33m";
     clg_color_table[COLOR_RESET] = "\033[0m";
-#endif
   }
 }
 
@@ -287,25 +290,36 @@ static enum eCLogColor clg_severity_to_color(enum CLG_Severity severity)
  * \{ */
 
 /**
- * Filter the indentifier based on very basic globbing.
+ * Filter the identifier based on very basic globbing.
  * - `foo` exact match of `foo`.
  * - `foo.bar` exact match for `foo.bar`
  * - `foo.*` match for `foo` & `foo.bar` & `foo.bar.baz`
+ * - `*bar*` match for `foo.bar` & `baz.bar` & `foo.barbaz`
  * - `*` matches everything.
  */
 static bool clg_ctx_filter_check(CLogContext *ctx, const char *identifier)
 {
-  const int identifier_len = strlen(identifier);
+  const size_t identifier_len = strlen(identifier);
   for (uint i = 0; i < 2; i++) {
     const CLG_IDFilter *flt = ctx->filters[i];
     while (flt != NULL) {
-      const int len = strlen(flt->match);
+      const size_t len = strlen(flt->match);
       if (STREQ(flt->match, "*") || ((len == identifier_len) && (STREQ(identifier, flt->match)))) {
         return (bool)i;
       }
-      if ((len >= 2) && (STREQLEN(".*", &flt->match[len - 2], 2))) {
+      if (flt->match[0] == '*' && flt->match[len - 1] == '*') {
+        char *match = MEM_callocN(sizeof(char) * len - 1, __func__);
+        memcpy(match, flt->match + 1, len - 2);
+        const bool success = (strstr(identifier, match) != NULL);
+        MEM_freeN(match);
+        if (success) {
+          return (bool)i;
+        }
+      }
+      else if ((len >= 2) && (STREQLEN(".*", &flt->match[len - 2], 2))) {
         if (((identifier_len == len - 2) && STREQLEN(identifier, flt->match, len - 2)) ||
-            ((identifier_len >= len - 1) && STREQLEN(identifier, flt->match, len - 1))) {
+            ((identifier_len >= len - 1) && STREQLEN(identifier, flt->match, len - 1)))
+        {
           return (bool)i;
         }
       }
@@ -345,6 +359,13 @@ static CLG_LogType *clg_ctx_type_register(CLogContext *ctx, const char *identifi
   return ty;
 }
 
+static void clg_ctx_error_action(CLogContext *ctx)
+{
+  if (ctx->callbacks.error_fn != NULL) {
+    ctx->callbacks.error_fn(ctx->output_file);
+  }
+}
+
 static void clg_ctx_fatal_action(CLogContext *ctx)
 {
   if (ctx->callbacks.fatal_fn != NULL) {
@@ -356,7 +377,7 @@ static void clg_ctx_fatal_action(CLogContext *ctx)
 
 static void clg_ctx_backtrace(CLogContext *ctx)
 {
-  /* Note: we avoid writing fo 'FILE', for backtrace we make an exception,
+  /* NOTE: we avoid writing to 'FILE', for back-trace we make an exception,
    * if necessary we could have a version of the callback that writes to file
    * descriptor all at once. */
   ctx->callbacks.backtrace_fn(ctx->output_file);
@@ -408,7 +429,7 @@ static void write_severity(CLogStringBuf *cstr, enum CLG_Severity severity, bool
   }
 }
 
-static void write_type(CLogStringBuf *cstr, CLG_LogType *lg)
+static void write_type(CLogStringBuf *cstr, const CLG_LogType *lg)
 {
   clg_str_append(cstr, " (");
   clg_str_append(cstr, lg->identifier);
@@ -439,7 +460,7 @@ static void write_file_line_fn(CLogStringBuf *cstr,
   clg_str_append(cstr, ": ");
 }
 
-void CLG_log_str(CLG_LogType *lg,
+void CLG_log_str(const CLG_LogType *lg,
                  enum CLG_Severity severity,
                  const char *file_line,
                  const char *fn,
@@ -477,11 +498,11 @@ void CLG_log_str(CLG_LogType *lg,
   }
 }
 
-void CLG_logf(CLG_LogType *lg,
+void CLG_logf(const CLG_LogType *lg,
               enum CLG_Severity severity,
               const char *file_line,
               const char *fn,
-              const char *fmt,
+              const char *format,
               ...)
 {
   CLogStringBuf cstr;
@@ -499,8 +520,8 @@ void CLG_logf(CLG_LogType *lg,
     write_file_line_fn(&cstr, file_line, fn, lg->ctx->use_basename);
 
     va_list ap;
-    va_start(ap, fmt);
-    clg_str_vappendf(&cstr, fmt, ap);
+    va_start(ap, format);
+    clg_str_vappendf(&cstr, format, ap);
     va_end(ap);
   }
   clg_str_append(&cstr, "\n");
@@ -513,6 +534,10 @@ void CLG_logf(CLG_LogType *lg,
 
   if (lg->ctx->callbacks.backtrace_fn) {
     clg_ctx_backtrace(lg->ctx);
+  }
+
+  if (severity == CLG_SEVERITY_ERROR) {
+    clg_ctx_error_action(lg->ctx);
   }
 
   if (severity == CLG_SEVERITY_FATAL) {
@@ -532,6 +557,23 @@ static void CLG_ctx_output_set(CLogContext *ctx, void *file_handle)
   ctx->output = fileno(ctx->output_file);
 #if defined(__unix__) || defined(__APPLE__)
   ctx->use_color = isatty(ctx->output);
+#elif defined(WIN32)
+  /* As of Windows 10 build 18298 all the standard consoles supports color
+   * like the Linux Terminal do, but it needs to be turned on.
+   * To turn on colors we need to enable virtual terminal processing by passing the flag
+   * ENABLE_VIRTUAL_TERMINAL_PROCESSING into SetConsoleMode.
+   * If the system doesn't support virtual terminal processing it will fail silently and the flag
+   * will not be set. */
+
+  GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &clg_previous_console_mode);
+
+  ctx->use_color = 0;
+  if (IsWindows10OrGreater() && isatty(ctx->output)) {
+    DWORD mode = clg_previous_console_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    if (SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), mode)) {
+      ctx->use_color = 1;
+    }
+  }
 #endif
 }
 
@@ -546,6 +588,12 @@ static void CLG_ctx_output_use_timestamp_set(CLogContext *ctx, int value)
   if (ctx->use_timestamp) {
     ctx->timestamp_tick_start = clg_timestamp_ticks_get();
   }
+}
+
+/** Action on error severity. */
+static void CLT_ctx_error_fn_set(CLogContext *ctx, void (*error_fn)(void *file_handle))
+{
+  ctx->callbacks.error_fn = error_fn;
 }
 
 /** Action on fatal severity. */
@@ -601,7 +649,6 @@ static CLogContext *CLG_ctx_init(void)
 #ifdef WITH_CLOG_PTHREADS
   pthread_mutex_init(&ctx->types_lock, NULL);
 #endif
-  ctx->use_color = true;
   ctx->default_type.level = 1;
   CLG_ctx_output_set(ctx, stdout);
 
@@ -610,10 +657,19 @@ static CLogContext *CLG_ctx_init(void)
 
 static void CLG_ctx_free(CLogContext *ctx)
 {
+#if defined(WIN32)
+  SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), clg_previous_console_mode);
+#endif
   while (ctx->types != NULL) {
     CLG_LogType *item = ctx->types;
     ctx->types = item->next;
     MEM_freeN(item);
+  }
+
+  while (ctx->refs != NULL) {
+    CLG_LogRef *item = ctx->refs;
+    ctx->refs = item->next;
+    item->type = NULL;
   }
 
   for (uint i = 0; i < 2; i++) {
@@ -667,6 +723,11 @@ void CLG_output_use_timestamp_set(int value)
   CLG_ctx_output_use_timestamp_set(g_ctx, value);
 }
 
+void CLG_error_fn_set(void (*error_fn)(void *file_handle))
+{
+  CLT_ctx_error_fn_set(g_ctx, error_fn);
+}
+
 void CLG_fatal_fn_set(void (*fatal_fn)(void *file_handle))
 {
   CLG_ctx_fatal_fn_set(g_ctx, fatal_fn);
@@ -696,7 +757,8 @@ void CLG_level_set(int level)
 
 /* -------------------------------------------------------------------- */
 /** \name Logging Reference API
- * Use to avoid lookups each time.
+ *
+ * Use to avoid look-ups each time.
  * \{ */
 
 void CLG_logref_init(CLG_LogRef *clg_ref)
@@ -706,6 +768,10 @@ void CLG_logref_init(CLG_LogRef *clg_ref)
   pthread_mutex_lock(&g_ctx->types_lock);
 #endif
   if (clg_ref->type == NULL) {
+    /* Add to the refs list so we can NULL the pointers to 'type' when CLG_exit() is called. */
+    clg_ref->next = g_ctx->refs;
+    g_ctx->refs = clg_ref;
+
     CLG_LogType *clg_ty = clg_ctx_type_find_by_name(g_ctx, clg_ref->identifier);
     if (clg_ty == NULL) {
       clg_ty = clg_ctx_type_register(g_ctx, clg_ref->identifier);
@@ -719,6 +785,14 @@ void CLG_logref_init(CLG_LogRef *clg_ref)
 #ifdef WITH_CLOG_PTHREADS
   pthread_mutex_unlock(&g_ctx->types_lock);
 #endif
+}
+
+int CLG_color_support_get(CLG_LogRef *clg_ref)
+{
+  if (clg_ref->type == NULL) {
+    CLG_logref_init(clg_ref);
+  }
+  return clg_ref->type->ctx->use_color;
 }
 
 /** \} */

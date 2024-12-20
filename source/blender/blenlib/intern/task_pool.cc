@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -20,29 +8,29 @@
  * Task pool to run tasks in parallel.
  */
 
+#include <cstdlib>
 #include <memory>
-#include <stdlib.h>
 #include <utility>
 
 #include "MEM_guardedalloc.h"
 
 #include "DNA_listBase.h"
 
-#include "BLI_math.h"
 #include "BLI_mempool.h"
 #include "BLI_task.h"
 #include "BLI_threads.h"
 
 #ifdef WITH_TBB
-/* Quiet top level deprecation message, unrelated to API usage here. */
-#  define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
-#  include <tbb/tbb.h>
+#  include <tbb/blocked_range.h>
+#  include <tbb/task_arena.h>
+#  include <tbb/task_group.h>
 #endif
 
-/* Task
+/**
+ * Task
  *
- * Unit of work to execute. This is a C++ class to work with TBB. */
-
+ * Unit of work to execute. This is a C++ class to work with TBB.
+ */
 class Task {
  public:
   TaskPool *pool;
@@ -83,14 +71,19 @@ class Task {
         free_taskdata(other.free_taskdata),
         freedata(other.freedata)
   {
-    other.pool = NULL;
-    other.run = NULL;
-    other.taskdata = NULL;
+    other.pool = nullptr;
+    other.run = nullptr;
+    other.taskdata = nullptr;
     other.free_taskdata = false;
-    other.freedata = NULL;
+    other.freedata = nullptr;
   }
 
-#if defined(WITH_TBB) && TBB_INTERFACE_VERSION_MAJOR < 10
+/* TBB has a check in `tbb/include/task_group.h` where `__TBB_CPP11_RVALUE_REF_PRESENT` should
+ * evaluate to true as with the other MSVC build. However, because of the clang compiler
+ * it does not and we attempt to call a deleted constructor in the tbb_task_pool_run function.
+ * This check fixes this issue and keeps our Task constructor valid. */
+#if (defined(WITH_TBB) && TBB_INTERFACE_VERSION_MAJOR < 10) || \
+    (defined(_MSC_VER) && defined(__clang__) && TBB_INTERFACE_VERSION_MAJOR < 12)
   Task(const Task &other)
       : pool(other.pool),
         run(other.run),
@@ -98,11 +91,11 @@ class Task {
         free_taskdata(other.free_taskdata),
         freedata(other.freedata)
   {
-    ((Task &)other).pool = NULL;
-    ((Task &)other).run = NULL;
-    ((Task &)other).taskdata = NULL;
+    ((Task &)other).pool = nullptr;
+    ((Task &)other).run = nullptr;
+    ((Task &)other).taskdata = nullptr;
     ((Task &)other).free_taskdata = false;
-    ((Task &)other).freedata = NULL;
+    ((Task &)other).freedata = nullptr;
   }
 #else
   Task(const Task &other) = delete;
@@ -111,15 +104,7 @@ class Task {
   Task &operator=(const Task &other) = delete;
   Task &operator=(Task &&other) = delete;
 
-  /* Execute task. */
-  void operator()() const
-  {
-#ifdef WITH_TBB
-    tbb::this_task_arena::isolate([this] { run(pool, taskdata); });
-#else
-    run(pool, taskdata);
-#endif
-  }
+  void operator()() const;
 };
 
 /* TBB Task Group.
@@ -129,8 +114,14 @@ class Task {
 #ifdef WITH_TBB
 class TBBTaskGroup : public tbb::task_group {
  public:
-  TBBTaskGroup(TaskPriority priority)
+  TBBTaskGroup(eTaskPriority priority)
   {
+#  if TBB_INTERFACE_VERSION_MAJOR >= 12
+    /* TODO: support priorities in TBB 2021, where they are only available as
+     * part of task arenas, no longer for task groups. Or remove support for
+     * task priorities if they are no longer useful. */
+    UNUSED_VARS(priority);
+#  else
     switch (priority) {
       case TASK_PRIORITY_LOW:
         my_context.set_priority(tbb::priority_low);
@@ -139,23 +130,20 @@ class TBBTaskGroup : public tbb::task_group {
         my_context.set_priority(tbb::priority_normal);
         break;
     }
-  }
-
-  ~TBBTaskGroup()
-  {
+#  endif
   }
 };
 #endif
 
 /* Task Pool */
 
-typedef enum TaskPoolType {
+enum TaskPoolType {
   TASK_POOL_TBB,
   TASK_POOL_TBB_SUSPENDED,
   TASK_POOL_NO_THREADS,
   TASK_POOL_BACKGROUND,
   TASK_POOL_BACKGROUND_SERIAL,
-} TaskPoolType;
+};
 
 struct TaskPool {
   TaskPoolType type;
@@ -164,8 +152,8 @@ struct TaskPool {
   ThreadMutex user_mutex;
   void *userdata;
 
-  /* TBB task pool. */
 #ifdef WITH_TBB
+  /* TBB task pool. */
   TBBTaskGroup tbb_group;
 #endif
   volatile bool is_suspended;
@@ -177,6 +165,12 @@ struct TaskPool {
   volatile bool background_is_canceling;
 };
 
+/* Execute task. */
+void Task::operator()() const
+{
+  run(pool, taskdata);
+}
+
 /* TBB Task Pool.
  *
  * Task pool using the TBB scheduler for tasks. When building without TBB
@@ -185,7 +179,7 @@ struct TaskPool {
  * Tasks may be suspended until in all are created, to make it possible to
  * initialize data structures and create tasks in a single pass. */
 
-static void tbb_task_pool_create(TaskPool *pool, TaskPriority priority)
+static void tbb_task_pool_create(TaskPool *pool, eTaskPriority priority)
 {
   if (pool->type == TASK_POOL_TBB_SUSPENDED) {
     pool->is_suspended = true;
@@ -268,7 +262,7 @@ static bool tbb_task_pool_canceled(TaskPool *pool)
 {
 #ifdef WITH_TBB
   if (pool->use_threads) {
-    return pool->tbb_group.is_canceling();
+    return tbb::is_current_task_group_canceling();
   }
 #else
   UNUSED_VARS(pool);
@@ -302,7 +296,7 @@ static void *background_task_run(void *userdata)
     task->~Task();
     MEM_freeN(task);
   }
-  return NULL;
+  return nullptr;
 }
 
 static void background_task_pool_create(TaskPool *pool)
@@ -362,7 +356,7 @@ static void background_task_pool_free(TaskPool *pool)
 
 /* Task Pool */
 
-static TaskPool *task_pool_create_ex(void *userdata, TaskPoolType type, TaskPriority priority)
+static TaskPool *task_pool_create_ex(void *userdata, TaskPoolType type, eTaskPriority priority)
 {
   const bool use_threads = BLI_task_scheduler_num_threads() > 1 && type != TASK_POOL_NO_THREADS;
 
@@ -397,55 +391,39 @@ static TaskPool *task_pool_create_ex(void *userdata, TaskPoolType type, TaskPrio
   return pool;
 }
 
-/**
- * Create a normal task pool. Tasks will be executed as soon as they are added.
- */
-TaskPool *BLI_task_pool_create(void *userdata, TaskPriority priority)
+TaskPool *BLI_task_pool_create(void *userdata, eTaskPriority priority)
 {
   return task_pool_create_ex(userdata, TASK_POOL_TBB, priority);
 }
 
-/**
- * Create a background task pool.
- * In multi-threaded context, there is no differences with #BLI_task_pool_create(),
- * but in single-threaded case it is ensured to have at least one worker thread to run on
- * (i.e. you don't have to call #BLI_task_pool_work_and_wait
- * on it to be sure it will be processed).
- *
- * \note Background pools are non-recursive
- * (that is, you should not create other background pools in tasks assigned to a background pool,
- * they could end never being executed, since the 'fallback' background thread is already
- * busy with parent task in single-threaded context).
- */
-TaskPool *BLI_task_pool_create_background(void *userdata, TaskPriority priority)
+TaskPool *BLI_task_pool_create_background(void *userdata, eTaskPriority priority)
 {
+  /* NOTE: In multi-threaded context, there is no differences with #BLI_task_pool_create(),
+   * but in single-threaded case it is ensured to have at least one worker thread to run on
+   * (i.e. you don't have to call #BLI_task_pool_work_and_wait
+   * on it to be sure it will be processed).
+   *
+   * NOTE: Background pools are non-recursive
+   * (that is, you should not create other background pools in tasks assigned to a background pool,
+   * they could end never being executed, since the 'fallback' background thread is already
+   * busy with parent task in single-threaded context). */
   return task_pool_create_ex(userdata, TASK_POOL_BACKGROUND, priority);
 }
 
-/**
- * Similar to BLI_task_pool_create() but does not schedule any tasks for execution
- * for until BLI_task_pool_work_and_wait() is called. This helps reducing threading
- * overhead when pushing huge amount of small initial tasks from the main thread.
- */
-TaskPool *BLI_task_pool_create_suspended(void *userdata, TaskPriority priority)
+TaskPool *BLI_task_pool_create_suspended(void *userdata, eTaskPriority priority)
 {
+  /* NOTE: Similar to #BLI_task_pool_create() but does not schedule any tasks for execution
+   * for until BLI_task_pool_work_and_wait() is called. This helps reducing threading
+   * overhead when pushing huge amount of small initial tasks from the main thread. */
   return task_pool_create_ex(userdata, TASK_POOL_TBB_SUSPENDED, priority);
 }
 
-/**
- * Single threaded task pool that executes pushed task immediately, for
- * debugging purposes.
- */
 TaskPool *BLI_task_pool_create_no_threads(void *userdata)
 {
   return task_pool_create_ex(userdata, TASK_POOL_NO_THREADS, TASK_PRIORITY_HIGH);
 }
 
-/**
- * Task pool that executes one task after the other, possibly on different threads
- * but never in parallel.
- */
-TaskPool *BLI_task_pool_create_background_serial(void *userdata, TaskPriority priority)
+TaskPool *BLI_task_pool_create_background_serial(void *userdata, eTaskPriority priority)
 {
   return task_pool_create_ex(userdata, TASK_POOL_BACKGROUND_SERIAL, priority);
 }
@@ -520,7 +498,7 @@ void BLI_task_pool_cancel(TaskPool *pool)
   }
 }
 
-bool BLI_task_pool_canceled(TaskPool *pool)
+bool BLI_task_pool_current_canceled(TaskPool *pool)
 {
   switch (pool->type) {
     case TASK_POOL_TBB:
@@ -531,7 +509,7 @@ bool BLI_task_pool_canceled(TaskPool *pool)
     case TASK_POOL_BACKGROUND_SERIAL:
       return background_task_pool_canceled(pool);
   }
-  BLI_assert("BLI_task_pool_canceled: Control flow should not come here!");
+  BLI_assert_msg(0, "BLI_task_pool_canceled: Control flow should not come here!");
   return false;
 }
 

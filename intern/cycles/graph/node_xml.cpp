@@ -1,24 +1,12 @@
-/*
- * Copyright 2011-2016 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "graph/node_xml.h"
 
-#include "util/util_foreach.h"
-#include "util/util_string.h"
-#include "util/util_transform.h"
+#include "util/foreach.h"
+#include "util/string.h"
+#include "util/transform.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -46,8 +34,9 @@ static void xml_read_float_array(T &value, xml_attribute attr)
   for (size_t i = 0; i < value.size(); i++) {
     float *value_float = (float *)&value[i];
 
-    for (size_t j = 0; j < VECTOR_SIZE; j++)
+    for (size_t j = 0; j < VECTOR_SIZE; j++) {
       value_float[j] = (float)atof(tokens[i * VECTOR_SIZE + j].c_str());
+    }
   }
 }
 
@@ -83,8 +72,9 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
 
         array<bool> value;
         value.resize(tokens.size());
-        for (size_t i = 0; i < value.size(); i++)
+        for (size_t i = 0; i < value.size(); i++) {
           value[i] = xml_read_boolean(tokens[i].c_str());
+        }
         node->set(socket, value);
         break;
       }
@@ -104,6 +94,10 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
       }
       case SocketType::UINT: {
         node->set(socket, (uint)atoi(attr.value()));
+        break;
+      }
+      case SocketType::UINT64: {
+        node->set(socket, (uint64_t)strtoull(attr.value(), nullptr, 10));
         break;
       }
       case SocketType::INT_ARRAY: {
@@ -200,8 +194,9 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
         map<ustring, Node *>::iterator it = reader.node_map.find(value);
         if (it != reader.node_map.end()) {
           Node *value_node = it->second;
-          if (value_node->is_a(*(socket.node_type)))
+          if (value_node->is_a(socket.node_type)) {
             node->set(socket, it->second);
+          }
         }
         break;
       }
@@ -215,7 +210,7 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
           map<ustring, Node *>::iterator it = reader.node_map.find(ustring(tokens[i]));
           if (it != reader.node_map.end()) {
             Node *value_node = it->second;
-            value[i] = (value_node->is_a(*(socket.node_type))) ? value_node : NULL;
+            value[i] = (value_node->is_a(socket.node_type)) ? value_node : NULL;
           }
           else {
             value[i] = NULL;
@@ -226,12 +221,14 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
       }
       case SocketType::CLOSURE:
       case SocketType::UNDEFINED:
+      case SocketType::NUM_TYPES:
         break;
     }
   }
 
-  if (!node->name.empty())
+  if (!node->name.empty()) {
     reader.node_map[node->name] = node;
+  }
 }
 
 xml_node xml_write_node(Node *node, xml_node xml_root)
@@ -263,8 +260,9 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
         const array<bool> &value = node->get_bool_array(socket);
         for (size_t i = 0; i < value.size(); i++) {
           ss << xml_write_boolean(value[i]);
-          if (i != value.size() - 1)
+          if (i != value.size() - 1) {
             ss << " ";
+          }
         }
         attr = ss.str().c_str();
         break;
@@ -291,6 +289,10 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
       }
       case SocketType::UINT: {
         attr = node->get_uint(socket);
+        break;
+      }
+      case SocketType::UINT64: {
+        attr = node->get_uint64(socket);
         break;
       }
       case SocketType::INT_ARRAY: {
@@ -422,6 +424,7 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
       }
       case SocketType::CLOSURE:
       case SocketType::UNDEFINED:
+      case SocketType::NUM_TYPES:
         break;
     }
   }

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -30,8 +18,9 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_heap_simple.h"
-#include "BLI_strict_flags.h"
 #include "BLI_utildefines.h"
+
+#include "BLI_strict_flags.h" /* Keep last. */
 
 #define HEAP_PARENT(i) (((i)-1) >> 1)
 
@@ -147,17 +136,12 @@ static void heapsimple_up(HeapSimple *heap, uint i, float active_val, void *acti
 /** \name Public HeapSimple API
  * \{ */
 
-/**
- * Creates a new simple heap, which only supports insertion and removal from top.
- *
- * \note Use when the size of the heap is known in advance.
- */
-HeapSimple *BLI_heapsimple_new_ex(uint tot_reserve)
+HeapSimple *BLI_heapsimple_new_ex(uint reserve_num)
 {
   HeapSimple *heap = MEM_mallocN(sizeof(HeapSimple), __func__);
   /* ensure we have at least one so we can keep doubling it */
   heap->size = 0;
-  heap->bufsize = MAX2(1u, tot_reserve);
+  heap->bufsize = MAX2(1u, reserve_num);
   heap->tree = MEM_mallocN(heap->bufsize * sizeof(HeapSimpleNode), "BLIHeapSimpleTree");
   return heap;
 }
@@ -190,10 +174,6 @@ void BLI_heapsimple_clear(HeapSimple *heap, HeapSimpleFreeFP ptrfreefp)
   heap->size = 0;
 }
 
-/**
- * Insert heap node with a value (often a 'cost') and pointer into the heap,
- * duplicate values are allowed.
- */
 void BLI_heapsimple_insert(HeapSimple *heap, float value, void *ptr)
 {
   if (UNLIKELY(heap->size >= heap->bufsize)) {
@@ -214,9 +194,6 @@ uint BLI_heapsimple_len(const HeapSimple *heap)
   return heap->size;
 }
 
-/**
- * Return the lowest value of the heap.
- */
 float BLI_heapsimple_top_value(const HeapSimple *heap)
 {
   BLI_assert(heap->size != 0);
@@ -224,9 +201,6 @@ float BLI_heapsimple_top_value(const HeapSimple *heap)
   return heap->tree[0].value;
 }
 
-/**
- * Pop the top node off the heap and return it's pointer.
- */
 void *BLI_heapsimple_pop_min(HeapSimple *heap)
 {
   BLI_assert(heap->size != 0);

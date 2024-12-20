@@ -1,54 +1,79 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2019-2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
-set(MESA_CFLAGS "-static-libgcc")
-set(MESA_CXXFLAGS "-static-libgcc -static-libstdc++ -Bstatic -lstdc++ -Bdynamic -l:libstdc++.a")
-set(MESA_LDFLAGS "-L${LIBDIR}/zlib/lib -pthread -static-libgcc -static-libstdc++ -Bstatic -lstdc++ -Bdynamic -l:libstdc++.a -l:libz_pic.a")
+# The 'native-file', used for overrides with the meson build system.
+# meson does not provide a way to do this using command line arguments.
+#
+# Note that we can't output to "${BUILD_DIR}/mesa/src/external_mesa" as
+# it doesn't exist when CMake first executes.
+file(WRITE ${BUILD_DIR}/mesa/tmp/native-file.ini "\
+[binaries]
+llvm-config = '${LIBDIR}/llvm/bin/llvm-config'"
+)
+
+# llvm-config will add -lmxl2. Make sure it can be found and that no system
+# library is used instead.
+set(MESA_LDFLAGS "-L${LIBDIR}/xml2/lib")
 
 set(MESA_EXTRA_FLAGS
-  CFLAGS=${MESA_CFLAGS}
-  CXXFLAGS=${MESA_CXXFLAGS}
-  LDFLAGS=${MESA_LDFLAGS}
-  --enable-glx=gallium-xlib
-  --with-gallium-drivers=swrast
-  --disable-dri
-  --disable-gbm
-  --disable-egl
-  --disable-gles1
-  --disable-gles2
-  --disable-llvm-shared-libs
-  --with-llvm-prefix=${LIBDIR}/llvm
+  ${MESON_BUILD_TYPE}
+  -Dc_args=${MESA_CFLAGS}
+  -Dcpp_args=${MESA_CXXFLAGS}
+  -Dc_link_args=${MESA_LDFLAGS}
+  -Dcpp_link_args=${MESA_LDFLAGS}
+  -Dglx=xlib
+  -Dgallium-drivers=swrast
+  -Dvulkan-drivers=
+  -Dgbm=disabled
+  -Degl=disabled
+  -Dgles1=disabled
+  -Dgles2=disabled
+  -Dcpp_rtti=false
+  -Dshared-llvm=disabled
+  # Without this, the build fails when: `wayland-scanner` is not found.
+  # At some point we will likely want to support Wayland.
+  # Disable for now since it's not officially supported.
+  -Dplatforms=x11
+  # Needed to find the local expat,zlib,zstd.
+  --pkg-config-path=${LIBDIR}/expat/lib/pkgconfig,${LIBDIR}/zstd/lib/pkgconfig,${LIBDIR}/zlib/share/pkgconfig
+  --native-file ${BUILD_DIR}/mesa/tmp/native-file.ini
 )
 
 ExternalProject_Add(external_mesa
-  URL ${MESA_URI}
+  URL file://${PACKAGE_DIR}/${MESA_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
-  URL_HASH MD5=${MESA_HASH}
+  URL_HASH ${MESA_HASH_TYPE}=${MESA_HASH}
   PREFIX ${BUILD_DIR}/mesa
+
   CONFIGURE_COMMAND ${CONFIGURE_ENV} &&
     cd ${BUILD_DIR}/mesa/src/external_mesa/ &&
-    ${CONFIGURE_COMMAND_NO_TARGET} --prefix=${LIBDIR}/mesa ${MESA_EXTRA_FLAGS}
-  BUILD_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/mesa/src/external_mesa/ && make -j${MAKE_THREADS}
-  INSTALL_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/mesa/src/external_mesa/ && make install
+    ${MESON}
+      ${BUILD_DIR}/mesa/src/external_mesa-build
+      --prefix=${LIBDIR}/mesa
+      ${MESA_EXTRA_FLAGS}
+
+  BUILD_COMMAND ${CONFIGURE_ENV} &&
+    cd ${BUILD_DIR}/mesa/src/external_mesa-build &&
+    ninja -j${MAKE_THREADS}
+
+  INSTALL_COMMAND ${CONFIGURE_ENV} &&
+    cd ${BUILD_DIR}/mesa/src/external_mesa-build &&
+    ninja install
+
   INSTALL_DIR ${LIBDIR}/mesa
 )
 
 add_dependencies(
   external_mesa
   ll
+  external_zlib
+  external_zstd
+  # Run-time dependency.
+  external_expat
+  # Needed for `MESON`.
+  external_python_site_packages
 )
+
+harvest(external_mesa libglu/lib mesa/lib "*${SHAREDLIBEXT}*")
+harvest(external_mesa mesa/lib64 mesa/lib "*${SHAREDLIBEXT}*")

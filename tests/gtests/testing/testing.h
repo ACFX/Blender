@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2014 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #ifndef __BLENDER_TESTING_H__
 #define __BLENDER_TESTING_H__
 
@@ -6,6 +9,22 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
+
+namespace blender::tests {
+
+/* These strings are passed on the CLI with the --test-asset-dir and --test-release-dir arguments.
+ * The arguments are added automatically when invoking tests via `ctest`. */
+const std::string &flags_test_asset_dir();   /* tests/data in the Blender repository. */
+const std::string &flags_test_release_dir(); /* bin/{blender version} in the build directory. */
+
+}  // namespace blender::tests
+
+#define EXPECT_V2_NEAR(a, b, eps) \
+  { \
+    EXPECT_NEAR(a[0], b[0], eps); \
+    EXPECT_NEAR(a[1], b[1], eps); \
+  } \
+  (void)0
 
 #define EXPECT_V3_NEAR(a, b, eps) \
   { \
@@ -24,6 +43,12 @@
   } \
   (void)0
 
+#define EXPECT_M2_NEAR(a, b, eps) \
+  do { \
+    EXPECT_V2_NEAR(a[0], b[0], eps); \
+    EXPECT_V2_NEAR(a[1], b[1], eps); \
+  } while (false);
+
 #define EXPECT_M3_NEAR(a, b, eps) \
   do { \
     EXPECT_V3_NEAR(a[0], b[0], eps); \
@@ -33,9 +58,9 @@
 
 #define EXPECT_M4_NEAR(a, b, eps) \
   do { \
-    EXPECT_V3_NEAR(a[0], b[0], eps); \
-    EXPECT_V3_NEAR(a[1], b[1], eps); \
-    EXPECT_V3_NEAR(a[2], b[2], eps); \
+    EXPECT_V4_NEAR(a[0], b[0], eps); \
+    EXPECT_V4_NEAR(a[1], b[1], eps); \
+    EXPECT_V4_NEAR(a[2], b[2], eps); \
     EXPECT_V4_NEAR(a[3], b[3], eps); \
   } while (false);
 
@@ -127,5 +152,35 @@ inline void EXPECT_EQ_ARRAY_ND(const T *expected, const T *actual, const size_t 
     }
   }
 }
+
+template<typename T, typename U>
+inline void EXPECT_NEAR_ARRAY_ND(
+    const T *expected, const T *actual, const size_t N, const size_t D, const U tolerance)
+{
+  for (size_t i = 0; i < N; ++i) {
+    for (size_t j = 0; j < D; ++j) {
+      EXPECT_NEAR(expected[i][j], actual[i][j], tolerance)
+          << "Element mismatch at index " << i << ", component index " << j;
+    }
+  }
+}
+
+#ifdef _WIN32
+#  define ABORT_PREDICATE ::testing::ExitedWithCode(3)
+#else
+#  define ABORT_PREDICATE ::testing::KilledBySignal(SIGABRT)
+#endif
+
+/* Test macro for when BLI_assert() is expected to fail.
+ * Note that the EXPECT_BLI_ASSERT macro is a no-op, unless used in a debug build with
+ * WITH_ASSERT_ABORT=ON. */
+#if defined(WITH_ASSERT_ABORT) && !defined(NDEBUG)
+/* EXPECT_EXIT() is used as that's the only exit-expecting function in GTest that allows us to
+ * check for SIGABRT. */
+#  define EXPECT_BLI_ASSERT(function_call, expect_message) \
+    EXPECT_EXIT(function_call, ABORT_PREDICATE, expect_message)
+#else
+#  define EXPECT_BLI_ASSERT(function_call, expect_message) function_call
+#endif
 
 #endif  // __BLENDER_TESTING_H__

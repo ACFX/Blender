@@ -21,31 +21,31 @@
 #include "libmv/simple_pipeline/tracks.h"
 
 #include <algorithm>
-#include <vector>
 #include <iterator>
+#include <vector>
 
 #include "libmv/numeric/numeric.h"
 
 namespace libmv {
 
-Tracks::Tracks(const Tracks &other) {
+Tracks::Tracks(const Tracks& other) {
   markers_ = other.markers_;
 }
 
-Tracks::Tracks(const vector<Marker> &markers) : markers_(markers) {}
+Tracks::Tracks(const vector<Marker>& markers) : markers_(markers) {
+}
 
 void Tracks::Insert(int image, int track, double x, double y, double weight) {
   // TODO(keir): Wow, this is quadratic for repeated insertions. Fix this by
   // adding a smarter data structure like a set<>.
   for (int i = 0; i < markers_.size(); ++i) {
-    if (markers_[i].image == image &&
-        markers_[i].track == track) {
+    if (markers_[i].image == image && markers_[i].track == track) {
       markers_[i].x = x;
       markers_[i].y = y;
       return;
     }
   }
-  Marker marker = { image, track, x, y, weight };
+  Marker marker = {image, track, x, y, weight};
   markers_.push_back(marker);
 }
 
@@ -77,8 +77,9 @@ vector<Marker> Tracks::MarkersInBothImages(int image1, int image2) const {
   vector<Marker> markers;
   for (int i = 0; i < markers_.size(); ++i) {
     int image = markers_[i].image;
-    if (image == image1 || image == image2)
+    if (image == image1 || image == image2) {
       markers.push_back(markers_[i]);
+    }
   }
   return markers;
 }
@@ -101,15 +102,17 @@ vector<Marker> Tracks::MarkersForTracksInBothImages(int image1,
   std::sort(image2_tracks.begin(), image2_tracks.end());
 
   std::vector<int> intersection;
-  std::set_intersection(image1_tracks.begin(), image1_tracks.end(),
-                        image2_tracks.begin(), image2_tracks.end(),
+  std::set_intersection(image1_tracks.begin(),
+                        image1_tracks.end(),
+                        image2_tracks.begin(),
+                        image2_tracks.end(),
                         std::back_inserter(intersection));
 
   vector<Marker> markers;
   for (int i = 0; i < markers_.size(); ++i) {
     if ((markers_[i].image == image1 || markers_[i].image == image2) &&
-        std::binary_search(intersection.begin(), intersection.end(),
-                           markers_[i].track)) {
+        std::binary_search(
+            intersection.begin(), intersection.end(), markers_[i].track)) {
       markers.push_back(markers_[i]);
     }
   }
@@ -122,7 +125,7 @@ Marker Tracks::MarkerInImageForTrack(int image, int track) const {
       return markers_[i];
     }
   }
-  Marker null = { -1, -1, -1, -1, 0.0 };
+  Marker null = {-1, -1, -1, -1, 0.0};
   return null;
 }
 
@@ -168,12 +171,12 @@ int Tracks::NumMarkers() const {
   return markers_.size();
 }
 
-void CoordinatesForMarkersInImage(const vector<Marker> &markers,
+void CoordinatesForMarkersInImage(const vector<Marker>& markers,
                                   int image,
-                                  Mat *coordinates) {
+                                  Mat* coordinates) {
   vector<Vec2> coords;
   for (int i = 0; i < markers.size(); ++i) {
-    const Marker &marker = markers[i];
+    const Marker& marker = markers[i];
     if (markers[i].image == image) {
       coords.push_back(Vec2(marker.x, marker.y));
     }

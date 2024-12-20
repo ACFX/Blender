@@ -1,3 +1,8 @@
+# The warnings below are disabled because they are too pedantic and not worth fixing.
+# Some of them will be enabled as part of the Clang-Tidy task, see T78535.
+
+# NOTE: No comments in the list below is allowed. Clang-tidy will ignore items after comments in the lists flag list.
+# This is because the comment is not a valid list item and it will stop parsing flags if a list item is a comment.
 Checks:  >
   -*,
   readability-*,
@@ -9,35 +14,42 @@ Checks:  >
   -readability-avoid-const-params-in-decls,
   -readability-simplify-boolean-expr,
   -readability-make-member-function-const,
-
-  -readability-misleading-indentation,
-
-  -readability-else-after-return,
-  -readability-inconsistent-declaration-parameter-name,
-  -readability-redundant-preprocessor,
-  -readability-function-size,
-  -readability-function-size,
-  -readability-redundant-string-init,
+  -readability-suspicious-call-argument,
   -readability-redundant-member-init,
-  -readability-const-return-type,
-  -readability-static-accessed-through-instance,
-  -readability-redundant-declaration,
-  -readability-qualified-auto,
+  -readability-misleading-indentation,
+  -readability-use-anyofallof,
+  -readability-identifier-length,
+
+  -readability-function-cognitive-complexity,
 
   bugprone-*,
   -bugprone-narrowing-conversions,
   -bugprone-unhandled-self-assignment,
   -bugprone-branch-clone,
   -bugprone-macro-parentheses,
+  -bugprone-reserved-identifier,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
 
   -bugprone-sizeof-expression,
   -bugprone-integer-division,
-  -bugprone-incorrect-roundings,
-  -bugprone-suspicious-string-compare,
-  -bugprone-not-null-terminated-result,
-  -bugprone-suspicious-missing-comma,
-  -bugprone-parent-virtual-call,
-  -bugprone-infinite-loop,
-  -bugprone-copy-constructor-init,
 
-WarningsAsErrors: '*'
+  -bugprone-redundant-branch-condition,
+
+  -bugprone-suspicious-include,
+
+  modernize-*,
+  -modernize-use-auto,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  -modernize-use-nodiscard,
+  -modernize-loop-convert,
+  -modernize-pass-by-value,
+  -modernize-raw-string-literal,
+  -modernize-return-braced-init-list,
+
+  objc-*
+
+CheckOptions:
+  - key: modernize-use-default-member-init.UseAssignment
+    value: 1

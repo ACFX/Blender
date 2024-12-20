@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -21,54 +9,55 @@
 
 #include "IndexedFaceSet.h"
 
+#include "BLI_sys_types.h"
+
 namespace Freestyle {
 
-IndexedFaceSet::IndexedFaceSet() : Rep()
+IndexedFaceSet::IndexedFaceSet()
 {
-  _Vertices = NULL;
-  _Normals = NULL;
-  _FrsMaterials = 0;
-  _TexCoords = NULL;
-  _FaceEdgeMarks = 0;
+  _Vertices = nullptr;
+  _Normals = nullptr;
+  _FrsMaterials = nullptr;
+  _TexCoords = nullptr;
+  _FaceEdgeMarks = nullptr;
   _VSize = 0;
   _NSize = 0;
   _MSize = 0;
   _TSize = 0;
   _NumFaces = 0;
-  _NumVertexPerFace = NULL;
-  _FaceStyle = NULL;
-  _VIndices = NULL;
+  _NumVertexPerFace = nullptr;
+  _FaceStyle = nullptr;
+  _VIndices = nullptr;
   _VISize = 0;
-  _NIndices = NULL;
+  _NIndices = nullptr;
   _NISize = 0;
-  _MIndices = NULL;
+  _MIndices = nullptr;
   _MISize = 0;
-  _TIndices = NULL;
+  _TIndices = nullptr;
   _TISize = 0;
 }
 
 IndexedFaceSet::IndexedFaceSet(float *iVertices,
-                               unsigned iVSize,
+                               uint iVSize,
                                float *iNormals,
-                               unsigned iNSize,
+                               uint iNSize,
                                FrsMaterial **iMaterials,
-                               unsigned iMSize,
+                               uint iMSize,
                                float *iTexCoords,
-                               unsigned iTSize,
-                               unsigned iNumFaces,
-                               unsigned *iNumVertexPerFace,
+                               uint iTSize,
+                               uint iNumFaces,
+                               uint *iNumVertexPerFace,
                                TRIANGLES_STYLE *iFaceStyle,
                                FaceEdgeMark *iFaceEdgeMarks,
-                               unsigned *iVIndices,
-                               unsigned iVISize,
-                               unsigned *iNIndices,
-                               unsigned iNISize,
-                               unsigned *iMIndices,
-                               unsigned iMISize,
-                               unsigned *iTIndices,
-                               unsigned iTISize,
-                               unsigned iCopy)
-    : Rep()
+                               uint *iVIndices,
+                               uint iVISize,
+                               uint *iNIndices,
+                               uint iNISize,
+                               uint *iMIndices,
+                               uint iMISize,
+                               uint *iTIndices,
+                               uint iTISize,
+                               uint iCopy)
 {
   if (1 == iCopy) {
     _VSize = iVSize;
@@ -80,23 +69,23 @@ IndexedFaceSet::IndexedFaceSet(float *iVertices,
     memcpy(_Normals, iNormals, iNSize * sizeof(float));
 
     _MSize = iMSize;
-    _FrsMaterials = 0;
+    _FrsMaterials = nullptr;
     if (iMaterials) {
       _FrsMaterials = new FrsMaterial *[_MSize];
-      for (unsigned int i = 0; i < _MSize; ++i) {
+      for (uint i = 0; i < _MSize; ++i) {
         _FrsMaterials[i] = new FrsMaterial(*(iMaterials[i]));
       }
     }
     _TSize = iTSize;
-    _TexCoords = 0;
+    _TexCoords = nullptr;
     if (_TSize) {
       _TexCoords = new float[_TSize];
       memcpy(_TexCoords, iTexCoords, iTSize * sizeof(float));
     }
 
     _NumFaces = iNumFaces;
-    _NumVertexPerFace = new unsigned[_NumFaces];
-    memcpy(_NumVertexPerFace, iNumVertexPerFace, _NumFaces * sizeof(unsigned));
+    _NumVertexPerFace = new uint[_NumFaces];
+    memcpy(_NumVertexPerFace, iNumVertexPerFace, _NumFaces * sizeof(uint));
 
     _FaceStyle = new TRIANGLES_STYLE[_NumFaces];
     memcpy(_FaceStyle, iFaceStyle, _NumFaces * sizeof(TRIANGLES_STYLE));
@@ -105,24 +94,24 @@ IndexedFaceSet::IndexedFaceSet(float *iVertices,
     memcpy(_FaceEdgeMarks, iFaceEdgeMarks, _NumFaces * sizeof(FaceEdgeMark));
 
     _VISize = iVISize;
-    _VIndices = new unsigned[_VISize];
-    memcpy(_VIndices, iVIndices, _VISize * sizeof(unsigned));
+    _VIndices = new uint[_VISize];
+    memcpy(_VIndices, iVIndices, _VISize * sizeof(uint));
 
     _NISize = iNISize;
-    _NIndices = new unsigned[_NISize];
-    memcpy(_NIndices, iNIndices, _NISize * sizeof(unsigned));
+    _NIndices = new uint[_NISize];
+    memcpy(_NIndices, iNIndices, _NISize * sizeof(uint));
 
     _MISize = iMISize;
-    _MIndices = 0;
+    _MIndices = nullptr;
     if (iMIndices) {
-      _MIndices = new unsigned[_MISize];
-      memcpy(_MIndices, iMIndices, _MISize * sizeof(unsigned));
+      _MIndices = new uint[_MISize];
+      memcpy(_MIndices, iMIndices, _MISize * sizeof(uint));
     }
     _TISize = iTISize;
-    _TIndices = 0;
+    _TIndices = nullptr;
     if (_TISize) {
-      _TIndices = new unsigned[_TISize];
-      memcpy(_TIndices, iTIndices, _TISize * sizeof(unsigned));
+      _TIndices = new uint[_TISize];
+      memcpy(_TIndices, iTIndices, _TISize * sizeof(uint));
     }
   }
   else {
@@ -133,7 +122,7 @@ IndexedFaceSet::IndexedFaceSet(float *iVertices,
     _Normals = iNormals;
 
     _MSize = iMSize;
-    _FrsMaterials = 0;
+    _FrsMaterials = nullptr;
     if (iMaterials) {
       _FrsMaterials = iMaterials;
     }
@@ -153,7 +142,7 @@ IndexedFaceSet::IndexedFaceSet(float *iVertices,
     _NIndices = iNIndices;
 
     _MISize = iMISize;
-    _MIndices = 0;
+    _MIndices = nullptr;
     if (iMISize) {
       _MIndices = iMIndices;
     }
@@ -176,24 +165,24 @@ IndexedFaceSet::IndexedFaceSet(const IndexedFaceSet &iBrother) : Rep(iBrother)
   _MSize = iBrother.msize();
   if (_MSize) {
     _FrsMaterials = new FrsMaterial *[_MSize];
-    for (unsigned int i = 0; i < _MSize; ++i) {
+    for (uint i = 0; i < _MSize; ++i) {
       _FrsMaterials[i] = new FrsMaterial(*(iBrother._FrsMaterials[i]));
     }
   }
   else {
-    _FrsMaterials = 0;
+    _FrsMaterials = nullptr;
   }
 
   _TSize = iBrother.tsize();
-  _TexCoords = 0;
+  _TexCoords = nullptr;
   if (_TSize) {
     _TexCoords = new float[_TSize];
     memcpy(_TexCoords, iBrother.texCoords(), _TSize * sizeof(float));
   }
 
   _NumFaces = iBrother.numFaces();
-  _NumVertexPerFace = new unsigned[_NumFaces];
-  memcpy(_NumVertexPerFace, iBrother.numVertexPerFaces(), _NumFaces * sizeof(unsigned));
+  _NumVertexPerFace = new uint[_NumFaces];
+  memcpy(_NumVertexPerFace, iBrother.numVertexPerFaces(), _NumFaces * sizeof(uint));
 
   _FaceStyle = new TRIANGLES_STYLE[_NumFaces];
   memcpy(_FaceStyle, iBrother.trianglesStyle(), _NumFaces * sizeof(TRIANGLES_STYLE));
@@ -202,87 +191,87 @@ IndexedFaceSet::IndexedFaceSet(const IndexedFaceSet &iBrother) : Rep(iBrother)
   memcpy(_FaceEdgeMarks, iBrother.faceEdgeMarks(), _NumFaces * sizeof(FaceEdgeMark));
 
   _VISize = iBrother.visize();
-  _VIndices = new unsigned[_VISize];
-  memcpy(_VIndices, iBrother.vindices(), _VISize * sizeof(unsigned));
+  _VIndices = new uint[_VISize];
+  memcpy(_VIndices, iBrother.vindices(), _VISize * sizeof(uint));
 
   _NISize = iBrother.nisize();
-  _NIndices = new unsigned[_NISize];
-  memcpy(_NIndices, iBrother.nindices(), _NISize * sizeof(unsigned));
+  _NIndices = new uint[_NISize];
+  memcpy(_NIndices, iBrother.nindices(), _NISize * sizeof(uint));
 
   _MISize = iBrother.misize();
   if (_MISize) {
-    _MIndices = new unsigned[_MISize];
-    memcpy(_MIndices, iBrother.mindices(), _MISize * sizeof(unsigned));
+    _MIndices = new uint[_MISize];
+    memcpy(_MIndices, iBrother.mindices(), _MISize * sizeof(uint));
   }
   else {
-    _MIndices = 0;
+    _MIndices = nullptr;
   }
 
   _TISize = iBrother.tisize();
-  _TIndices = 0;
+  _TIndices = nullptr;
   if (_TISize) {
-    _TIndices = new unsigned[_TISize];
-    memcpy(_TIndices, iBrother.tindices(), _TISize * sizeof(unsigned));
+    _TIndices = new uint[_TISize];
+    memcpy(_TIndices, iBrother.tindices(), _TISize * sizeof(uint));
   }
 }
 
 IndexedFaceSet::~IndexedFaceSet()
 {
-  if (NULL != _Vertices) {
+  if (nullptr != _Vertices) {
     delete[] _Vertices;
-    _Vertices = NULL;
+    _Vertices = nullptr;
   }
 
-  if (NULL != _Normals) {
+  if (nullptr != _Normals) {
     delete[] _Normals;
-    _Normals = NULL;
+    _Normals = nullptr;
   }
 
-  if (NULL != _FrsMaterials) {
-    for (unsigned int i = 0; i < _MSize; ++i) {
+  if (nullptr != _FrsMaterials) {
+    for (uint i = 0; i < _MSize; ++i) {
       delete _FrsMaterials[i];
     }
     delete[] _FrsMaterials;
-    _FrsMaterials = NULL;
+    _FrsMaterials = nullptr;
   }
 
-  if (NULL != _TexCoords) {
+  if (nullptr != _TexCoords) {
     delete[] _TexCoords;
-    _TexCoords = NULL;
+    _TexCoords = nullptr;
   }
 
-  if (NULL != _NumVertexPerFace) {
+  if (nullptr != _NumVertexPerFace) {
     delete[] _NumVertexPerFace;
-    _NumVertexPerFace = NULL;
+    _NumVertexPerFace = nullptr;
   }
 
-  if (NULL != _FaceStyle) {
+  if (nullptr != _FaceStyle) {
     delete[] _FaceStyle;
-    _FaceStyle = NULL;
+    _FaceStyle = nullptr;
   }
 
-  if (NULL != _FaceEdgeMarks) {
+  if (nullptr != _FaceEdgeMarks) {
     delete[] _FaceEdgeMarks;
-    _FaceEdgeMarks = NULL;
+    _FaceEdgeMarks = nullptr;
   }
 
-  if (NULL != _VIndices) {
+  if (nullptr != _VIndices) {
     delete[] _VIndices;
-    _VIndices = NULL;
+    _VIndices = nullptr;
   }
 
-  if (NULL != _NIndices) {
+  if (nullptr != _NIndices) {
     delete[] _NIndices;
-    _NIndices = NULL;
+    _NIndices = nullptr;
   }
 
-  if (NULL != _MIndices) {
+  if (nullptr != _MIndices) {
     delete[] _MIndices;
-    _MIndices = NULL;
+    _MIndices = nullptr;
   }
-  if (NULL != _TIndices) {
+  if (nullptr != _TIndices) {
     delete[] _TIndices;
-    _TIndices = NULL;
+    _TIndices = nullptr;
   }
 }
 
@@ -305,7 +294,7 @@ void IndexedFaceSet::ComputeBBox()
   // parse all the coordinates to find the Xmax, YMax, ZMax
   float *v = _Vertices;
 
-  for (unsigned int i = 0; i < (_VSize / 3); ++i) {
+  for (uint i = 0; i < (_VSize / 3); ++i) {
     if (*v > XMax) {
       XMax = *v;
     }

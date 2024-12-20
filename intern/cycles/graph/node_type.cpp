@@ -1,22 +1,10 @@
-/*
- * Copyright 2011-2016 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "graph/node_type.h"
-#include "util/util_foreach.h"
-#include "util/util_transform.h"
+#include "util/foreach.h"
+#include "util/transform.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -36,6 +24,7 @@ size_t SocketType::size(Type type)
 {
   switch (type) {
     case UNDEFINED:
+    case NUM_TYPES:
       return 0;
 
     case BOOLEAN:
@@ -46,6 +35,8 @@ size_t SocketType::size(Type type)
       return sizeof(int);
     case UINT:
       return sizeof(uint);
+    case UINT64:
+      return sizeof(uint64_t);
     case COLOR:
       return sizeof(float3);
     case VECTOR:
@@ -102,7 +93,7 @@ size_t SocketType::max_size()
 
 void *SocketType::zero_default_value()
 {
-  static Transform zero_transform = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
+  static Transform zero_transform = transform_zero();
   return &zero_transform;
 }
 
@@ -112,11 +103,12 @@ ustring SocketType::type_name(Type type)
 
                             ustring("boolean"),       ustring("float"),
                             ustring("int"),           ustring("uint"),
-                            ustring("color"),         ustring("vector"),
-                            ustring("point"),         ustring("normal"),
-                            ustring("point2"),        ustring("closure"),
-                            ustring("string"),        ustring("enum"),
-                            ustring("transform"),     ustring("node"),
+                            ustring("uint64"),        ustring("color"),
+                            ustring("vector"),        ustring("point"),
+                            ustring("normal"),        ustring("point2"),
+                            ustring("closure"),       ustring("string"),
+                            ustring("enum"),          ustring("transform"),
+                            ustring("node"),
 
                             ustring("array_boolean"), ustring("array_float"),
                             ustring("array_int"),     ustring("array_color"),
@@ -124,6 +116,9 @@ ustring SocketType::type_name(Type type)
                             ustring("array_normal"),  ustring("array_point2"),
                             ustring("array_string"),  ustring("array_transform"),
                             ustring("array_node")};
+
+  constexpr size_t num_names = sizeof(names) / sizeof(*names);
+  static_assert(num_names == NUM_TYPES);
 
   return names[(int)type];
 }
@@ -144,9 +139,7 @@ NodeType::NodeType(Type type, const NodeType *base) : type(type), base(base)
   }
 }
 
-NodeType::~NodeType()
-{
-}
+NodeType::~NodeType() {}
 
 void NodeType::register_input(ustring name,
                               ustring ui_name,
@@ -154,7 +147,7 @@ void NodeType::register_input(ustring name,
                               int struct_offset,
                               const void *default_value,
                               const NodeEnum *enum_values,
-                              const NodeType **node_type,
+                              const NodeType *node_type,
                               int flags,
                               int extra_flags)
 {
@@ -167,6 +160,8 @@ void NodeType::register_input(ustring name,
   socket.enum_values = enum_values;
   socket.node_type = node_type;
   socket.flags = flags | extra_flags;
+  assert(inputs.size() < std::numeric_limits<SocketModifiedFlags>::digits);
+  socket.modified_flag_bit = (1ull << inputs.size());
   inputs.push_back(socket);
 }
 
@@ -208,9 +203,9 @@ const SocketType *NodeType::find_output(ustring name) const
 
 /* Node Type Registry */
 
-unordered_map<ustring, NodeType, ustringHash> &NodeType::types()
+unordered_map<ustring, NodeType> &NodeType::types()
 {
-  static unordered_map<ustring, NodeType, ustringHash> _types;
+  static unordered_map<ustring, NodeType> _types;
   return _types;
 }
 
@@ -234,7 +229,7 @@ NodeType *NodeType::add(const char *name_, CreateFunc create_, Type type_, const
 
 const NodeType *NodeType::find(ustring name)
 {
-  unordered_map<ustring, NodeType, ustringHash>::iterator it = types().find(name);
+  unordered_map<ustring, NodeType>::iterator it = types().find(name);
   return (it == types().end()) ? NULL : &it->second;
 }
 

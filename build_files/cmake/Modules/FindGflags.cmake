@@ -1,33 +1,9 @@
-# Ceres Solver - A fast non-linear least squares minimizer
-# Copyright 2015 Google Inc. All rights reserved.
-# http://ceres-solver.org/
+# SPDX-FileCopyrightText: 2015 Google Inc. All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# * Redistributions of source code must retain the above copyright notice,
-#   this list of conditions and the following disclaimer.
-# * Redistributions in binary form must reproduce the above copyright notice,
-#   this list of conditions and the following disclaimer in the documentation
-#   and/or other materials provided with the distribution.
-# * Neither the name of Google Inc. nor the names of its contributors may be
-#   used to endorse or promote products derived from this software without
-#   specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-#
-# Author: alexs.mac@gmail.com (Alex Stewart)
-#
+# SPDX-License-Identifier: BSD-3-Clause
+
+# Ceres Solver - A fast non-linear least squares minimizer http://ceres-solver.org/
+# Author: Alex Stewart <alexs.mac@gmail.com>
 
 # FindGflags.cmake - Find Google gflags logging library.
 #
@@ -48,7 +24,7 @@
 #                   gflags to be something else (i.e. google for legacy
 #                   compatibility).
 #
-# The following variables control the behaviour of this module when an exported
+# The following variables control the behavior of this module when an exported
 # gflags CMake configuration is not found.
 #
 # GFLAGS_PREFER_EXPORTED_GFLAGS_CMAKE_CONFIGURATION: TRUE/FALSE, iff TRUE then
@@ -71,7 +47,7 @@
 # The following variables are also defined by this module, but in line with
 # CMake recommended FindPackage() module style should NOT be referenced directly
 # by callers (use the plural variables detailed above instead).  These variables
-# do however affect the behaviour of the module via FIND_[PATH/LIBRARY]() which
+# do however affect the behavior of the module via FIND_[PATH/LIBRARY]() which
 # are NOT re-called (i.e. search for library is not repeated) if these variables
 # are set with valid values _in the CMake cache_. This means that if these
 # variables are set directly in the cache, either by the user in the CMake GUI,
@@ -84,9 +60,13 @@
 # GFLAGS_LIBRARY: gflags library, not including the libraries of any
 #                 dependencies.
 
-# If GFLAGS_ROOT_DIR was defined in the environment, use it.
-if(NOT GFLAGS_ROOT_DIR AND NOT $ENV{GFLAGS_ROOT_DIR} STREQUAL "")
+# If `GFLAGS_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED GFLAGS_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{GFLAGS_ROOT_DIR})
   set(GFLAGS_ROOT_DIR $ENV{GFLAGS_ROOT_DIR})
+else()
+  set(GFLAGS_ROOT_DIR "")
 endif()
 
 if(DEFINED GFLAGS_ROOT_DIR)
@@ -472,8 +452,7 @@ if(NOT GFLAGS_FOUND)
     gflags_report_not_found(
       "Could not find gflags include directory, set GFLAGS_INCLUDE_DIR "
       "to directory containing gflags/gflags.h")
-  endif(NOT GFLAGS_INCLUDE_DIR OR
-    NOT EXISTS ${GFLAGS_INCLUDE_DIR})
+  endif()
 
   find_library(GFLAGS_LIBRARY NAMES gflags
     PATHS ${GFLAGS_LIBRARY_DIR_HINTS}
@@ -484,8 +463,7 @@ if(NOT GFLAGS_FOUND)
     gflags_report_not_found(
       "Could not find gflags library, set GFLAGS_LIBRARY "
       "to full path to libgflags.")
-  endif(NOT GFLAGS_LIBRARY OR
-    NOT EXISTS ${GFLAGS_LIBRARY})
+  endif()
 
   # gflags typically requires a threading library (which is OS dependent), note
   # that this defines the CMAKE_THREAD_LIBS_INIT variable.  If we are able to
@@ -560,8 +538,7 @@ if(NOT GFLAGS_FOUND)
     gflags_report_not_found(
       "Caller defined GFLAGS_INCLUDE_DIR:"
       " ${GFLAGS_INCLUDE_DIR} does not contain gflags/gflags.h header.")
-  endif(GFLAGS_INCLUDE_DIR AND
-    NOT EXISTS ${GFLAGS_INCLUDE_DIR}/gflags/gflags.h)
+  endif()
   # TODO: This regex for gflags library is pretty primitive, we use lowercase
   #       for comparison to handle Windows using CamelCase library names, could
   #       this check be better?
@@ -571,8 +548,7 @@ if(NOT GFLAGS_FOUND)
     gflags_report_not_found(
       "Caller defined GFLAGS_LIBRARY: "
       "${GFLAGS_LIBRARY} does not match gflags.")
-  endif(GFLAGS_LIBRARY AND
-    NOT "${LOWERCASE_GFLAGS_LIBRARY}" MATCHES ".*gflags[^/]*")
+  endif()
 
   gflags_reset_find_library_prefix()
 

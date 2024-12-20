@@ -1,32 +1,19 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_FLUID_TYPES_H__
-#define __DNA_FLUID_TYPES_H__
+#pragma once
 
 #include "DNA_listBase.h"
 
-/* Domain flags. */
+/**
+ * #FluidDomainSettings.flags
+ * Domain flags.
+ */
 enum {
   FLUID_DOMAIN_USE_NOISE = (1 << 1),        /* Use noise. */
   FLUID_DOMAIN_USE_DISSOLVE = (1 << 2),     /* Let smoke dissolve. */
@@ -46,9 +33,13 @@ enum {
   FLUID_DOMAIN_DELETE_IN_OBSTACLE = (1 << 14),  /* Delete fluid inside obstacles. */
   FLUID_DOMAIN_USE_DIFFUSION = (1 << 15), /* Use diffusion (e.g. viscosity, surface tension). */
   FLUID_DOMAIN_USE_RESUMABLE_CACHE = (1 << 16), /* Determine if cache should be resumable. */
+  FLUID_DOMAIN_USE_VISCOSITY = (1 << 17),       /* Use viscosity. */
 };
 
-/* Border collisions. */
+/**
+ * #FluidDomainSettings.border_collisions
+ * Border collisions.
+ */
 enum {
   FLUID_DOMAIN_BORDER_FRONT = (1 << 1),
   FLUID_DOMAIN_BORDER_BACK = (1 << 2),
@@ -67,19 +58,19 @@ enum {
   FLUID_DOMAIN_FILE_BIN_OBJECT = (1 << 4),
 };
 
-/* Slice method. */
-enum {
-  FLUID_DOMAIN_SLICE_VIEW_ALIGNED = 0,
-  FLUID_DOMAIN_SLICE_AXIS_ALIGNED = 1,
-};
-
-/* Axis aligned method. */
+/**
+ * #FluidDomainSettings.axis_slice_method
+ * Axis aligned method.
+ */
 enum {
   AXIS_SLICE_FULL = 0,
   AXIS_SLICE_SINGLE = 1,
 };
 
-/* Single slice direction. */
+/**
+ * #FluidDomainSettings.slice_axis
+ * Single slice direction.
+ */
 enum {
   SLICE_AXIS_AUTO = 0,
   SLICE_AXIS_X = 1,
@@ -87,22 +78,47 @@ enum {
   SLICE_AXIS_Z = 3,
 };
 
-/* Axis aligned method. */
-enum {
-  VOLUME_INTERP_LINEAR = 0,
-  VOLUME_INTERP_CUBIC = 1,
-};
+/**
+ * #FluidDomainSettings.interp_method
+ * Display interpolation method.
+ */
+typedef enum FLUID_DisplayInterpolationMethod {
+  FLUID_DISPLAY_INTERP_LINEAR = 0,
+  FLUID_DISPLAY_INTERP_CUBIC = 1,
+  FLUID_DISPLAY_INTERP_CLOSEST = 2,
+} FLUID_DisplayInterpolationMethod;
 
+/** #FluidDomainSettings.vector_draw_type */
 enum {
   VECTOR_DRAW_NEEDLE = 0,
   VECTOR_DRAW_STREAMLINE = 1,
+  VECTOR_DRAW_MAC = 2,
 };
 
+/** #FluidDomainSettings.vector_draw_mac_components */
+enum {
+  VECTOR_DRAW_MAC_X = (1 << 0),
+  VECTOR_DRAW_MAC_Y = (1 << 1),
+  VECTOR_DRAW_MAC_Z = (1 << 2),
+};
+
+/**
+ * #FluidDomainSettings.vector_field
+ * Fluid domain vector fields.
+ */
+typedef enum FLUID_DisplayVectorField {
+  FLUID_DOMAIN_VECTOR_FIELD_VELOCITY = 0,
+  FLUID_DOMAIN_VECTOR_FIELD_GUIDE_VELOCITY = 1,
+  FLUID_DOMAIN_VECTOR_FIELD_FORCE = 2,
+} FLUID_DisplayVectorField;
+
+/** #FluidDomainSettings.sndparticle_boundary */
 enum {
   SNDPARTICLE_BOUNDARY_DELETE = 0,
   SNDPARTICLE_BOUNDARY_PUSHOUT = 1,
 };
 
+/** #FluidDomainSettings.sndparticle_combined_export */
 enum {
   SNDPARTICLE_COMBINED_EXPORT_OFF = 0,
   SNDPARTICLE_COMBINED_EXPORT_SPRAY_FOAM = 1,
@@ -111,6 +127,7 @@ enum {
   SNDPARTICLE_COMBINED_EXPORT_SPRAY_FOAM_BUBBLE = 4,
 };
 
+/** #FluidDomainSettings.coba_field */
 enum {
   FLUID_DOMAIN_FIELD_DENSITY = 0,
   FLUID_DOMAIN_FIELD_HEAT = 1,
@@ -126,17 +143,41 @@ enum {
   FLUID_DOMAIN_FIELD_FORCE_X = 11,
   FLUID_DOMAIN_FIELD_FORCE_Y = 12,
   FLUID_DOMAIN_FIELD_FORCE_Z = 13,
+  FLUID_DOMAIN_FIELD_PHI = 14,
+  FLUID_DOMAIN_FIELD_PHI_IN = 15,
+  FLUID_DOMAIN_FIELD_PHI_OUT = 16,
+  FLUID_DOMAIN_FIELD_PHI_OBSTACLE = 17,
+  FLUID_DOMAIN_FIELD_FLAGS = 18,
+  FLUID_DOMAIN_FIELD_PRESSURE = 19,
+};
+
+/**
+ * #FluidDomainSettings.gridlines_color_field
+ * Fluid grid-line display color field types.
+ */
+enum {
+  FLUID_GRIDLINE_COLOR_TYPE_NONE = 0,
+  FLUID_GRIDLINE_COLOR_TYPE_FLAGS = 1,
+  FLUID_GRIDLINE_COLOR_TYPE_RANGE = 2,
+};
+
+/**
+ * #FluidDomainSettings.gridlines_cell_filter
+ * Fluid cell types.
+ */
+enum {
+  FLUID_CELL_TYPE_NONE = 0,
+  FLUID_CELL_TYPE_FLUID = (1 << 0),
+  FLUID_CELL_TYPE_OBSTACLE = (1 << 1),
+  FLUID_CELL_TYPE_EMPTY = (1 << 2),
+  FLUID_CELL_TYPE_INFLOW = (1 << 3),
+  FLUID_CELL_TYPE_OUTFLOW = (1 << 4),
 };
 
 /* Fluid domain types. */
 enum {
   FLUID_DOMAIN_TYPE_GAS = 0,
   FLUID_DOMAIN_TYPE_LIQUID = 1,
-};
-
-/* Smoke noise types. */
-enum {
-  FLUID_NOISE_TYPE_WAVELET = (1 << 0),
 };
 
 /* Mesh levelset generator types. */
@@ -225,9 +266,10 @@ enum {
 #define FLUID_NAME_PARTICLES "fluid_particles"
 #define FLUID_NAME_GUIDING "fluid_guiding"
 
-/* Fluid object names.*/
-#define FLUID_NAME_FLAGS "flags"                   /* == OpenVDB grid attribute name. */
-#define FLUID_NAME_VELOCITY "velocity"             /* == OpenVDB grid attribute name. */
+/* Fluid object names. */
+#define FLUID_NAME_FLAGS "flags"       /* == OpenVDB grid attribute name. */
+#define FLUID_NAME_VELOCITY "velocity" /* == OpenVDB grid attribute name. */
+#define FLUID_NAME_VEL "vel"
 #define FLUID_NAME_VELOCITYTMP "velocity_previous" /* == OpenVDB grid attribute name. */
 #define FLUID_NAME_VELOCITYX "x_vel"
 #define FLUID_NAME_VELOCITYY "y_vel"
@@ -251,7 +293,6 @@ enum {
 #define FLUID_NAME_OBVEL_Z "z_obvel"
 #define FLUID_NAME_FRACTIONS "fractions"
 #define FLUID_NAME_INVELC "invelC"
-#define FLUID_NAME_INVEL "invel"
 #define FLUID_NAME_INVEL_X "x_invel"
 #define FLUID_NAME_INVEL_Y "y_invel"
 #define FLUID_NAME_INVEL_Z "z_invel"
@@ -368,7 +409,8 @@ enum {
 #define FLUID_NAME_GUIDEVEL_X "x_guidevel"
 #define FLUID_NAME_GUIDEVEL_Y "y_guidevel"
 #define FLUID_NAME_GUIDEVEL_Z "z_guidevel"
-#define FLUID_NAME_GUIDEVEL "velocity_guide"
+#define FLUID_NAME_GUIDEVEL "guidevel"
+#define FLUID_NAME_VELOCITY_GUIDE "velocity_guide"
 
 /* Cache file extensions. */
 #define FLUID_DOMAIN_EXTENSION_UNI ".uni"
@@ -403,6 +445,7 @@ enum {
 enum {
   VDB_PRECISION_HALF_FLOAT = 0,
   VDB_PRECISION_FULL_FLOAT = 1,
+  VDB_PRECISION_MINI_FLOAT = 2,
 };
 
 /* Deprecated values (i.e. all defines and enums below this line up until typedefs). */
@@ -418,10 +461,6 @@ enum {
   SM_HRES_LINEAR = 1,
   SM_HRES_FULLSAMPLE = 2,
 };
-
-typedef struct FluidDomainVertexVelocity {
-  float vel[3];
-} FluidDomainVertexVelocity;
 
 typedef struct FluidDomainSettings {
 
@@ -445,9 +484,9 @@ typedef struct FluidDomainSettings {
   struct GPUTexture *tex_velocity_x;
   struct GPUTexture *tex_velocity_y;
   struct GPUTexture *tex_velocity_z;
+  struct GPUTexture *tex_flags;
+  struct GPUTexture *tex_range_field;
   struct Object *guide_parent;
-  /** Vertex velocities of simulated fluid mesh. */
-  struct FluidDomainVertexVelocity *mesh_velocities;
   struct EffectorWeights *effector_weights;
 
   /* Domain object data. */
@@ -456,7 +495,7 @@ typedef struct FluidDomainSettings {
   float p1[3];          /* End point of BB in local space. */
   float dp0[3];         /* Difference from object center to grid start point. */
   float cell_size[3];   /* Size of simulation cell in local space. */
-  float global_size[3]; /* Global size of domain axises. */
+  float global_size[3]; /* Global size of domain axes. */
   float prev_loc[3];
   int shift[3];         /* Current domain shift in simulation cells. */
   float shift_f[3];     /* Exact domain shift. */
@@ -476,7 +515,7 @@ typedef struct FluidDomainSettings {
   int boundary_width;     /* Usually this is just 1. */
   float gravity_final[3]; /* Scene or domain gravity multiplied with gravity weight. */
 
-  /* -- User-accesible fields (from here on). -- */
+  /* -- User-accessible fields (from here on). -- */
 
   /* Adaptive domain options. */
   int adapt_margin;
@@ -512,8 +551,7 @@ typedef struct FluidDomainSettings {
   float noise_time_anim;
   int res_noise[3];
   int noise_scale;
-  short noise_type; /* Noise type: wave, curl, anisotropic. */
-  char _pad3[2];    /* Unused. */
+  char _pad3[4]; /* Unused. */
 
   /* Liquid domain options. */
   float particle_randomness;
@@ -523,9 +561,15 @@ typedef struct FluidDomainSettings {
   float particle_radius;
   float particle_band_width;
   float fractions_threshold;
+  float fractions_distance;
   float flip_ratio;
+  int sys_particle_maximum;
   short simulation_method;
   char _pad4[6];
+
+  /* Viscosity options. */
+  float viscosity_value;
+  char _pad5[4];
 
   /* Diffusion options. */
   float surface_tension;
@@ -539,9 +583,8 @@ typedef struct FluidDomainSettings {
   int mesh_smoothen_pos;
   int mesh_smoothen_neg;
   int mesh_scale;
-  int totvert;
   short mesh_generator;
-  char _pad5[6]; /* Unused. */
+  char _pad6[2]; /* Unused. */
 
   /* Secondary particle options. */
   int particle_type;
@@ -562,7 +605,7 @@ typedef struct FluidDomainSettings {
   int sndparticle_update_radius;
   char sndparticle_boundary;
   char sndparticle_combined_export;
-  char _pad6[6]; /* Unused. */
+  char _pad7[6]; /* Unused. */
 
   /* Fluid guiding options. */
   float guide_alpha;      /* Guiding weight scalar (determines strength). */
@@ -570,7 +613,7 @@ typedef struct FluidDomainSettings {
   float guide_vel_factor; /* Multiply guiding velocity by this factor. */
   int guide_res[3];       /* Res for velocity guide grids - independent from base res. */
   short guide_source;
-  char _pad7[2]; /* Unused. */
+  char _pad8[2]; /* Unused. */
 
   /* Cache options. */
   int cache_frame_start;
@@ -590,7 +633,7 @@ typedef struct FluidDomainSettings {
   char error[64]; /* Bake error description. */
   short cache_type;
   char cache_id[4]; /* Run-time only */
-  char _pad8[2];
+  char _pad9[2];    /* Unused. */
 
   /* Time options. */
   float dt;
@@ -603,39 +646,56 @@ typedef struct FluidDomainSettings {
   int timesteps_maximum;
 
   /* Display options. */
-  char slice_method, axis_slice_method;
-  char slice_axis, draw_velocity;
   float slice_per_voxel;
   float slice_depth;
   float display_thickness;
+  float grid_scale;
   struct ColorBand *coba;
   float vector_scale;
+  float gridlines_lower_bound;
+  float gridlines_upper_bound;
+  float gridlines_range_color[4];
+  char axis_slice_method;
+  char slice_axis;
+  char show_gridlines;
+  char draw_velocity;
   char vector_draw_type;
+  char vector_field; /* Simulation field used for vector display. */
+  char vector_scale_with_magnitude;
+  char vector_draw_mac_components;
   char use_coba;
   char coba_field; /* Simulation field used for the color mapping. */
   char interp_method;
+  char gridlines_color_field; /* Simulation field used to color map onto gridlines. */
+  char gridlines_cell_filter;
+  char _pad10[3]; /* Unused. */
+
+  /* Velocity factor for motion blur rendering. */
+  float velocity_scale;
 
   /* OpenVDB cache options. */
   int openvdb_compression;
   float clipping;
   char openvdb_data_depth;
-  char _pad9[7]; /* Unused. */
+  char _pad11[7]; /* Unused. */
 
-  /* -- Deprecated / unsed options (below). -- */
+  /* -- Deprecated / unused options (below). -- */
 
   /* View options. */
   int viewsettings;
-  char _pad10[4]; /* Unused. */
+  char _pad12[4]; /* Unused. */
 
-  /* Pointcache options. */
-  /* Smoke uses only one cache from now on (index [0]), but keeping the array for now for reading
-   * old files. */
-  struct PointCache *point_cache[2]; /* Definition is in DNA_object_force_types.h. */
+  /**
+   * Point-cache options.
+   * Smoke uses only one cache from now on (index [0]),
+   * but keeping the array for now for reading old files.
+   */
+  struct PointCache *point_cache[2];
   struct ListBase ptcaches[2];
   int cache_comp;
   int cache_high_comp;
   char cache_file_format;
-  char _pad11[7]; /* Unused. */
+  char _pad13[7]; /* Unused. */
 
 } FluidDomainSettings;
 
@@ -704,7 +764,7 @@ typedef struct FluidFlowSettings {
   float vel_coord[3];
   char _pad1[4];
 
-  /* -- User-accesible fields (from here on). -- */
+  /* -- User-accessible fields (from here on). -- */
 
   /* Emission. */
   float density;
@@ -724,14 +784,15 @@ typedef struct FluidFlowSettings {
   float texture_offset;
   char _pad2[4];
   /* MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
+  char _pad3[4];
   short vgroup_density;
 
-  short type;     /* Smoke, flames, both, outflow, liquid.  */
-  short behavior; /* Inflow, outflow, static.  */
+  short type;     /* Smoke, flames, both, outflow, liquid. */
+  short behavior; /* Inflow, outflow, static. */
   short source;
   short texture_type;
-  short _pad3[3];
+  short _pad4[3];
   int flags; /* Absolute emission etc. */
 } FluidFlowSettings;
 
@@ -770,9 +831,9 @@ typedef struct FluidEffectorSettings {
   float *verts_old;
   int numverts;
 
-  /* -- User-accesible fields (from here on). -- */
+  /* -- User-accessible fields (from here on). -- */
 
-  float surface_distance; /* Thickness of mesh surface, used in obstacle sdf. */
+  float surface_distance; /* Thickness of mesh surface, used in obstacle SDF. */
   int flags;
   int subframes;
   short type;
@@ -783,5 +844,3 @@ typedef struct FluidEffectorSettings {
   short guide_mode;
   char _pad2[2];
 } FluidEffectorSettings;
-
-#endif

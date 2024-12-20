@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __BLI_DISJOINT_SET_HH__
-#define __BLI_DISJOINT_SET_HH__
+#pragma once
 
 /** \file
  * \ingroup bli
@@ -24,22 +11,24 @@
  */
 
 #include "BLI_array.hh"
+#include "BLI_index_range.hh"
 
 namespace blender {
 
-class DisjointSet {
+template<typename T = int64_t> class DisjointSet {
  private:
-  Array<uint> parents_;
-  Array<uint> ranks_;
+  Array<T> parents_;
+  Array<T> ranks_;
 
  public:
   /**
    * Create a new disjoint set with the given size. Initially, every element is in a separate set.
    */
-  DisjointSet(uint size) : parents_(size), ranks_(size, 0)
+  DisjointSet(const int64_t size) : parents_(size), ranks_(size, 0)
   {
-    for (uint i = 0; i < size; i++) {
-      parents_[i] = i;
+    BLI_assert(size >= 0);
+    for (const int64_t i : IndexRange(size)) {
+      parents_[i] = T(i);
     }
   }
 
@@ -47,10 +36,10 @@ class DisjointSet {
    * Join the sets containing elements x and y. Nothing happens when they have been in the same set
    * before.
    */
-  void join(uint x, uint y)
+  void join(const T x, const T y)
   {
-    uint root1 = this->find_root(x);
-    uint root2 = this->find_root(y);
+    T root1 = this->find_root(x);
+    T root2 = this->find_root(y);
 
     /* x and y are in the same set already. */
     if (root1 == root2) {
@@ -71,29 +60,30 @@ class DisjointSet {
   /**
    * Return true when x and y are in the same set.
    */
-  bool in_same_set(uint x, uint y)
+  bool in_same_set(const T x, const T y)
   {
-    uint root1 = this->find_root(x);
-    uint root2 = this->find_root(y);
+    T root1 = this->find_root(x);
+    T root2 = this->find_root(y);
     return root1 == root2;
   }
 
   /**
    * Find the element that represents the set containing x currently.
    */
-  uint find_root(uint x)
+  T find_root(const T x)
   {
     /* Find root by following parents. */
-    uint root = x;
+    T root = x;
     while (parents_[root] != root) {
       root = parents_[root];
     }
 
     /* Compress path. */
-    while (parents_[x] != root) {
-      uint parent = parents_[x];
-      parents_[x] = root;
-      x = parent;
+    T to_root = x;
+    while (parents_[to_root] != root) {
+      const T parent = parents_[to_root];
+      parents_[to_root] = root;
+      to_root = parent;
     }
 
     return root;
@@ -101,5 +91,3 @@ class DisjointSet {
 };
 
 }  // namespace blender
-
-#endif /* __BLI_DISJOINT_SET_HH__ */

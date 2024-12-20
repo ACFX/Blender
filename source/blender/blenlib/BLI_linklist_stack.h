@@ -1,24 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __BLI_LINKLIST_STACK_H__
-#define __BLI_LINKLIST_STACK_H__
+#pragma once
 
 /** \file
  * \ingroup bli
@@ -29,16 +13,13 @@
  * \note These macros follow STACK_* macros defined in 'BLI_utildefines.h'
  *       and should be kept (mostly) interchangeable.
  *
- * \note ``_##var##_type`` is a dummy variable only used for typechecks.
+ * \note `_##var##_type` is a dummy variable only used for type-checks.
  */
 
 /* -------------------------------------------------------------------- */
-/* Linked Stack using BLI_mempool
- *
- * Uses mempool for storage.
- */
-
 /** \name Linked Stack (mempool)
+ *
+ * Uses #BLI_mempool for storage.
  * \{ */
 
 #define BLI_LINKSTACK_DECLARE(var, type) \
@@ -55,20 +36,28 @@
 
 #define BLI_LINKSTACK_SIZE(var) BLI_mempool_len(var##_pool_)
 
-/* check for typeof() */
-#ifdef __GNUC__
+/* Check for `decltype()` or `typeof()` support. */
+#if defined(__cplusplus)
 #  define BLI_LINKSTACK_PUSH(var, ptr) \
-    (CHECK_TYPE_INLINE(ptr, typeof(var##_type_)), \
+    (CHECK_TYPE_INLINE_NONCONST(ptr, decltype(var##_type_)), \
      BLI_linklist_prepend_pool(&(var), ptr, var##_pool_))
 #  define BLI_LINKSTACK_POP(var) \
-    (var ? (typeof(var##_type_))BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
+    (decltype(var##_type_))(var ? BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
 #  define BLI_LINKSTACK_POP_DEFAULT(var, r) \
-    (var ? (typeof(var##_type_))BLI_linklist_pop_pool(&(var), var##_pool_) : r)
-#else /* non gcc */
+    (decltype(var##_type_))(var ? BLI_linklist_pop_pool(&(var), var##_pool_) : r)
+#elif defined(__GNUC__)
+#  define BLI_LINKSTACK_PUSH(var, ptr) \
+    (CHECK_TYPE_INLINE_NONCONST(ptr, typeof(var##_type_)), \
+     BLI_linklist_prepend_pool(&(var), ptr, var##_pool_))
+#  define BLI_LINKSTACK_POP(var) \
+    (typeof(var##_type_))(var ? BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
+#  define BLI_LINKSTACK_POP_DEFAULT(var, r) \
+    (typeof(var##_type_))(var ? BLI_linklist_pop_pool(&(var), var##_pool_) : r)
+#else /* Non GCC/C++. */
 #  define BLI_LINKSTACK_PUSH(var, ptr) (BLI_linklist_prepend_pool(&(var), ptr, var##_pool_))
 #  define BLI_LINKSTACK_POP(var) (var ? BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
 #  define BLI_LINKSTACK_POP_DEFAULT(var, r) (var ? BLI_linklist_pop_pool(&(var), var##_pool_) : r)
-#endif /* gcc check */
+#endif
 
 #define BLI_LINKSTACK_SWAP(var_a, var_b) \
   { \
@@ -95,13 +84,12 @@
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/* Linked Stack, using stack memory (alloca)
+/** \name Linked Stack (alloca)
+ *
+ * Linked Stack, using stack memory (alloca).
  *
  * alloca never frees, pop'd items are stored in a free-list for reuse.
  * only use for lists small enough to fit on the stack.
- */
-
-/** \name Linked Stack (alloca)
  * \{ */
 
 #ifdef __GNUC__
@@ -124,7 +112,7 @@
       _##var##_free = _##var##_free->next; \
     } \
     else { \
-      _##var##_temp = alloca(sizeof(LinkNode)); \
+      _##var##_temp = (LinkNode *)alloca(sizeof(LinkNode)); \
     } \
     _##var##_temp->next = _##var##_stack; \
     _##var##_temp->link = data; \
@@ -167,8 +155,9 @@
     LinkNode *_##var##_iter; \
     unsigned int i; \
     for (_##var##_iter = _##var##_stack, i = 0; _##var##_iter; \
-         _##var##_iter = _##var##_iter->next, i++) { \
-      (data)[i] = _BLI_SMALLSTACK_CAST(var)(_##var##_iter->link); \
+         _##var##_iter = _##var##_iter->next, i++) \
+    { \
+      *(void **)&(data)[i] = _##var##_iter->link; \
     } \
   } \
   ((void)0)
@@ -194,5 +183,3 @@
   (void)0
 
 /** \} */
-
-#endif /* __BLI_LINKLIST_STACK_H__ */

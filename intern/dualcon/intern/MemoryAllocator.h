@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #ifndef __MEMORYALLOCATOR_H__
 #define __MEMORYALLOCATOR_H__
@@ -34,9 +22,7 @@
  */
 class VirtualMemoryAllocator {
  public:
-  virtual ~VirtualMemoryAllocator()
-  {
-  }
+  virtual ~VirtualMemoryAllocator() {}
 
   virtual void *allocate() = 0;
   virtual void deallocate(void *obj) = 0;
@@ -47,15 +33,13 @@ class VirtualMemoryAllocator {
   virtual int getAll() = 0;
   virtual int getBytes() = 0;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("DUALCON:VirtualMemoryAllocator")
-#endif
 };
 
 /**
  * Dynamic memory allocator - allows allocation/deallocation
  *
- * Note: there are 4 bytes overhead for each allocated yet unused object.
+ * NOTE: there are 4 bytes overhead for each allocated yet unused object.
  */
 template<int N> class MemoryAllocator : public VirtualMemoryAllocator {
  private:
@@ -208,9 +192,7 @@ template<int N> class MemoryAllocator : public VirtualMemoryAllocator {
     return N;
   };
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("DUALCON:MemoryAllocator")
-#endif
 };
 
 #endif /* __MEMORYALLOCATOR_H__ */

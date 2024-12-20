@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -28,13 +16,15 @@
 #include "Stroke.h"
 #include "StrokeIterators.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 namespace Freestyle {
 
 Operators::I1DContainer Operators::_current_view_edges_set;
 Operators::I1DContainer Operators::_current_chains_set;
-Operators::I1DContainer *Operators::_current_set = NULL;
+Operators::I1DContainer *Operators::_current_set = nullptr;
 Operators::StrokesContainer Operators::_current_strokes_set;
 
 int Operators::select(UnaryPredicate1D &pred)
@@ -87,13 +77,14 @@ int Operators::chain(ViewEdgeInternal::ViewEdgeIterator &it,
     return 0;
   }
 
-  unsigned id = 0;
+  uint id = 0;
   ViewEdge *edge;
   I1DContainer new_chains_set;
 
   for (I1DContainer::iterator it_edge = _current_view_edges_set.begin();
        it_edge != _current_view_edges_set.end();
-       ++it_edge) {
+       ++it_edge)
+  {
     if (pred(**it_edge) < 0) {
       goto error;
     }
@@ -151,7 +142,7 @@ int Operators::chain(ViewEdgeInternal::ViewEdgeIterator &it, UnaryPredicate1D &p
     return 0;
   }
 
-  unsigned id = 0;
+  uint id = 0;
   Functions1D::IncrementChainingTimeStampF1D ts;
   Predicates1D::EqualToChainingTimeStampUP1D pred_ts(TimeStamp::instance()->getTimeStamp() + 1);
   ViewEdge *edge;
@@ -159,7 +150,8 @@ int Operators::chain(ViewEdgeInternal::ViewEdgeIterator &it, UnaryPredicate1D &p
 
   for (I1DContainer::iterator it_edge = _current_view_edges_set.begin();
        it_edge != _current_view_edges_set.end();
-       ++it_edge) {
+       ++it_edge)
+  {
     if (pred(**it_edge) < 0) {
       goto error;
     }
@@ -230,13 +222,14 @@ void Operators::bidirectionalChain(ViewEdgeIterator &it,
     return;
   }
 
-  unsigned id = 0;
+  uint id = 0;
   ViewEdge *edge;
   Chain *new_chain;
 
   for (I1DContainer::iterator it_edge = _current_view_edges_set.begin();
        it_edge != _current_view_edges_set.end();
-       ++it_edge) {
+       ++it_edge)
+  {
     if (pred(**it_edge)) {
       continue;
     }
@@ -279,7 +272,7 @@ void Operators::bidirectionalChain(ViewEdgeIterator &it, UnaryPredicate1D &pred)
     return;
   }
 
-  unsigned id = 0;
+  uint id = 0;
   Functions1D::IncrementChainingTimeStampF1D ts;
   Predicates1D::EqualToChainingTimeStampUP1D pred_ts(TimeStamp::instance()->getTimeStamp() + 1);
 
@@ -288,7 +281,8 @@ void Operators::bidirectionalChain(ViewEdgeIterator &it, UnaryPredicate1D &pred)
 
   for (I1DContainer::iterator it_edge = _current_view_edges_set.begin();
        it_edge != _current_view_edges_set.end();
-       ++it_edge) {
+       ++it_edge)
+  {
     if (pred(**it_edge) || pred_ts(**it_edge)) {
       continue;
     }
@@ -332,7 +326,7 @@ int Operators::bidirectionalChain(ChainingIterator &it, UnaryPredicate1D &pred)
     return 0;
   }
 
-  unsigned id = 0;
+  uint id = 0;
   Functions1D::IncrementChainingTimeStampF1D ts;
   Predicates1D::EqualToChainingTimeStampUP1D pred_ts(TimeStamp::instance()->getTimeStamp() + 1);
   ViewEdge *edge;
@@ -340,7 +334,8 @@ int Operators::bidirectionalChain(ChainingIterator &it, UnaryPredicate1D &pred)
 
   for (I1DContainer::iterator it_edge = _current_view_edges_set.begin();
        it_edge != _current_view_edges_set.end();
-       ++it_edge) {
+       ++it_edge)
+  {
     if (pred(**it_edge) < 0) {
       goto error;
     }
@@ -435,7 +430,7 @@ int Operators::bidirectionalChain(ChainingIterator &it)
     return 0;
   }
 
-  unsigned id = 0;
+  uint id = 0;
   Functions1D::IncrementChainingTimeStampF1D ts;
   Predicates1D::EqualToChainingTimeStampUP1D pred_ts(TimeStamp::instance()->getTimeStamp() + 1);
   ViewEdge *edge;
@@ -443,7 +438,8 @@ int Operators::bidirectionalChain(ChainingIterator &it)
 
   for (I1DContainer::iterator it_edge = _current_view_edges_set.begin();
        it_edge != _current_view_edges_set.end();
-       ++it_edge) {
+       ++it_edge)
+  {
     if (pred_ts(**it_edge) < 0) {
       goto error;
     }
@@ -656,7 +652,7 @@ int Operators::sequentialSplit(UnaryPredicate0D &startingPred,
           goto error;
         }
       } while (!startingPred.result);
-    } while ((itStart != end) && (itStart != last));
+    } while (!ELEM(itStart, end, last));
   }
 
   // Update the current set of chains:
@@ -738,7 +734,7 @@ static int __recursiveSplit(Chain *_curve,
 
   // retrieves the current splitting id
   Id *newId = _curve->getSplittingId();
-  if (newId == 0) {
+  if (newId == nullptr) {
     newId = new Id(_curve->getId());
     _curve->setSplittingId(newId);
   }
@@ -757,7 +753,8 @@ static int __recursiveSplit(Chain *_curve,
 
   for (; (vit != vitend) && (vnext != vitend) &&
          (vnext._CurvilinearLength < split._CurvilinearLength);
-       ++vit, ++vnext) {
+       ++vit, ++vnext)
+  {
     new_curve_a->push_vertex_back(&(*vit));
   }
   if ((vit == vitend) || (vnext == vitend)) {
@@ -810,7 +807,7 @@ int Operators::recursiveSplit(UnaryFunction0D<double> &func,
     return 0;
   }
 
-  Chain *currentChain = 0;
+  Chain *currentChain = nullptr;
   I1DContainer splitted_chains;
   I1DContainer newChains;
   I1DContainer::iterator cit = _current_chains_set.begin(), citend = _current_chains_set.end();
@@ -885,15 +882,15 @@ static int __recursiveSplit(Chain *_curve,
 #endif
   real _min = FLT_MAX;
   ++it;
-  real mean = 0.f;
+  // real mean = 0.0f;
   // soc unused - real variance                              = 0.0f;
-  unsigned count = 0;
+  // uint count = 0;
   CurveInternal::CurvePointIterator next = it;
   ++next;
 
   bool bsplit = false;
   for (; ((it != end) && (next != end)); ++it, ++next) {
-    ++count;
+    // ++count;
     it0d = it.castToInterface0DIterator();
     if (pred0d(it0d) < 0) {
       return -1;
@@ -904,14 +901,14 @@ static int __recursiveSplit(Chain *_curve,
     if (func(it0d) < 0) {
       return -1;
     }
-    mean += func.result;
+    // mean += func.result;
     if (func.result < _min) {
       _min = func.result;
       split = it;
       bsplit = true;
     }
   }
-  mean /= (float)count;
+  // mean /= float(count);
 
   // if ((!bsplit) || (mean - _min > mean)) { // we didn't find any minimum
   if (!bsplit) {  // we didn't find any minimum
@@ -921,7 +918,7 @@ static int __recursiveSplit(Chain *_curve,
 
   // retrieves the current splitting id
   Id *newId = _curve->getSplittingId();
-  if (newId == NULL) {
+  if (newId == nullptr) {
     newId = new Id(_curve->getId());
     _curve->setSplittingId(newId);
   }
@@ -940,7 +937,8 @@ static int __recursiveSplit(Chain *_curve,
 
   for (; (vit != vitend) && (vnext != vitend) &&
          (vnext._CurvilinearLength < split._CurvilinearLength);
-       ++vit, ++vnext) {
+       ++vit, ++vnext)
+  {
     new_curve_a->push_vertex_back(&(*vit));
   }
   if ((vit == vitend) || (vnext == vitend)) {
@@ -994,7 +992,7 @@ int Operators::recursiveSplit(UnaryFunction0D<double> &func,
     return 0;
   }
 
-  Chain *currentChain = 0;
+  Chain *currentChain = nullptr;
   I1DContainer splitted_chains;
   I1DContainer newChains;
   I1DContainer::iterator cit = _current_chains_set.begin(), citend = _current_chains_set.end();
@@ -1095,7 +1093,7 @@ static Stroke *createStroke(Interface1D &inter)
   Vec2r previous = current;
   SVertex *sv;
   CurvePoint *cp;
-  StrokeVertex *stroke_vertex = NULL;
+  StrokeVertex *stroke_vertex = nullptr;
   bool hasSingularity = false;
 
   do {
@@ -1122,7 +1120,7 @@ static Stroke *createStroke(Interface1D &inter)
     stroke->push_back(stroke_vertex);
     previous = current;
     ++it;
-  } while ((it != itend) && (it != itfirst));
+  } while (!ELEM(it, itend, itfirst));
 
   if (it == itfirst) {
     // Add last vertex:
@@ -1152,7 +1150,7 @@ static Stroke *createStroke(Interface1D &inter)
   // Discard the stroke if the number of stroke vertices is less than two
   if (stroke->strokeVerticesSize() < 2) {
     delete stroke;
-    return NULL;
+    return nullptr;
   }
   stroke->setLength(currentCurvilignAbscissa);
   if (hasSingularity) {
@@ -1198,7 +1196,7 @@ static Stroke *createStroke(Interface1D &inter)
         else {
           // Discard the stroke because all stroke vertices are overlapping
           delete stroke;
-          return NULL;
+          return nullptr;
         }
         current = overlapping_vertices.front()->getPoint();
         Vec2r dir(target - current);
@@ -1279,7 +1277,8 @@ int Operators::create(UnaryPredicate1D &pred, vector<StrokeShader *> shaders)
   }
   StrokesContainer new_strokes_set;
   for (Operators::I1DContainer::iterator it = _current_set->begin(); it != _current_set->end();
-       ++it) {
+       ++it)
+  {
     if (pred(**it) < 0) {
       goto error;
     }
@@ -1298,16 +1297,16 @@ int Operators::create(UnaryPredicate1D &pred, vector<StrokeShader *> shaders)
     }
   }
 
-  for (StrokesContainer::iterator it = new_strokes_set.begin(); it != new_strokes_set.end();
-       ++it) {
+  for (StrokesContainer::iterator it = new_strokes_set.begin(); it != new_strokes_set.end(); ++it)
+  {
     _current_strokes_set.push_back(*it);
   }
   new_strokes_set.clear();
   return 0;
 
 error:
-  for (StrokesContainer::iterator it = new_strokes_set.begin(); it != new_strokes_set.end();
-       ++it) {
+  for (StrokesContainer::iterator it = new_strokes_set.begin(); it != new_strokes_set.end(); ++it)
+  {
     delete (*it);
   }
   new_strokes_set.clear();
@@ -1323,7 +1322,8 @@ void Operators::reset(bool removeStrokes)
   }
   _current_view_edges_set.clear();
   for (I1DContainer::iterator it = _current_chains_set.begin(); it != _current_chains_set.end();
-       ++it) {
+       ++it)
+  {
     delete *it;
   }
   _current_chains_set.clear();

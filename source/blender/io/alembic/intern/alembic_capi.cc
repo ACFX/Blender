@@ -1,27 +1,18 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
  */
 
 #include "../ABC_alembic.h"
+#include "IO_types.hh"
 
+#include <Alembic/AbcGeom/ILight.h>
 #include <Alembic/AbcMaterial/IMaterial.h>
 
+#include "abc_axis_conversion.h"
 #include "abc_reader_archive.h"
 #include "abc_reader_camera.h"
 #include "abc_reader_curves.h"
@@ -34,43 +25,40 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_cachefile_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_modifier_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
-#include "BKE_cachefile.h"
-#include "BKE_context.h"
-#include "BKE_curve.h"
-#include "BKE_global.h"
-#include "BKE_layer.h"
-#include "BKE_lib_id.h"
-#include "BKE_object.h"
-#include "BKE_scene.h"
+#include "BKE_cachefile.hh"
+#include "BKE_context.hh"
+#include "BKE_global.hh"
+#include "BKE_layer.hh"
+#include "BKE_lib_id.hh"
+#include "BKE_object.hh"
 
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_build.hh"
 
-#include "ED_undo.h"
-
-/* SpaceType struct has a member called 'new' which obviously conflicts with C++
- * so temporarily redefining the new keyword to make it compile. */
-#define new extern_new
-#include "BKE_screen.h"
-#undef new
+#include "ED_undo.hh"
 
 #include "BLI_compiler_compat.h"
-#include "BLI_fileops.h"
-#include "BLI_ghash.h"
 #include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_path_util.h"
+#include "BLI_math_matrix.h"
+#include "BLI_path_utils.hh"
+#include "BLI_sort.hh"
+#include "BLI_span.hh"
 #include "BLI_string.h"
+#include "BLI_timeit.hh"
 
-#include "WM_api.h"
-#include "WM_types.h"
+#include "BLT_translation.hh"
 
+#include "WM_api.hh"
+#include "WM_types.hh"
+
+using Alembic::Abc::IV3fArrayProperty;
 using Alembic::Abc::ObjectHeader;
+using Alembic::Abc::PropertyHeader;
+using Alembic::Abc::V3fArraySamplePtr;
 using Alembic::AbcGeom::ICamera;
 using Alembic::AbcGeom::ICurves;
 using Alembic::AbcGeom::IFaceSet;
@@ -79,29 +67,37 @@ using Alembic::AbcGeom::INuPatch;
 using Alembic::AbcGeom::IObject;
 using Alembic::AbcGeom::IPoints;
 using Alembic::AbcGeom::IPolyMesh;
+using Alembic::AbcGeom::IPolyMeshSchema;
 using Alembic::AbcGeom::ISampleSelector;
 using Alembic::AbcGeom::ISubD;
 using Alembic::AbcGeom::IXform;
+using Alembic::AbcGeom::kWrapExisting;
 using Alembic::AbcGeom::MetaData;
 using Alembic::AbcMaterial::IMaterial;
 
 using namespace blender::io::alembic;
 
-struct AbcArchiveHandle {
-  int unused;
-};
-
-BLI_INLINE ArchiveReader *archive_from_handle(AbcArchiveHandle *handle)
+BLI_INLINE ArchiveReader *archive_from_handle(CacheArchiveHandle *handle)
 {
   return reinterpret_cast<ArchiveReader *>(handle);
 }
 
-BLI_INLINE AbcArchiveHandle *handle_from_archive(ArchiveReader *archive)
+BLI_INLINE CacheArchiveHandle *handle_from_archive(ArchiveReader *archive)
 {
-  return reinterpret_cast<AbcArchiveHandle *>(archive);
+  return reinterpret_cast<CacheArchiveHandle *>(archive);
 }
 
-//#define USE_NURBS
+/* Add the object's path to list of object paths. No duplication is done, callers are
+ * responsible for ensuring that only unique paths are added to the list.
+ */
+static void add_object_path(ListBase *object_paths, const IObject &object)
+{
+  CacheObjectPath *abc_path = MEM_cnew<CacheObjectPath>("CacheObjectPath");
+  STRNCPY(abc_path->path, object.getFullName().c_str());
+  BLI_addtail(object_paths, abc_path);
+}
+
+// #define USE_NURBS
 
 /* NOTE: this function is similar to visit_objects below, need to keep them in
  * sync. */
@@ -148,25 +144,35 @@ static bool gather_objects_paths(const IObject &object, ListBase *object_paths)
   }
 
   if (get_path) {
-    void *abc_path_void = MEM_callocN(sizeof(AlembicObjectPath), "AlembicObjectPath");
-    AlembicObjectPath *abc_path = static_cast<AlembicObjectPath *>(abc_path_void);
-
-    BLI_strncpy(abc_path->path, object.getFullName().c_str(), sizeof(abc_path->path));
-    BLI_addtail(object_paths, abc_path);
+    add_object_path(object_paths, object);
   }
 
   return parent_is_part_of_this_object;
 }
 
-AbcArchiveHandle *ABC_create_handle(struct Main *bmain,
-                                    const char *filename,
-                                    ListBase *object_paths)
+CacheArchiveHandle *ABC_create_handle(const Main *bmain,
+                                      const char *filepath,
+                                      const CacheFileLayer *layers,
+                                      ListBase *object_paths)
 {
-  ArchiveReader *archive = new ArchiveReader(bmain, filename);
+  std::vector<const char *> filepaths;
+  filepaths.push_back(filepath);
 
-  if (!archive->valid()) {
+  while (layers) {
+    if ((layers->flag & CACHEFILE_LAYER_HIDDEN) == 0) {
+      filepaths.push_back(layers->filepath);
+    }
+    layers = layers->next;
+  }
+
+  /* We need to reverse the order as overriding archives should come first. */
+  std::reverse(filepaths.begin(), filepaths.end());
+
+  ArchiveReader *archive = ArchiveReader::get(bmain, filepaths);
+
+  if (!archive || !archive->valid()) {
     delete archive;
-    return NULL;
+    return nullptr;
   }
 
   if (object_paths) {
@@ -176,7 +182,7 @@ AbcArchiveHandle *ABC_create_handle(struct Main *bmain,
   return handle_from_archive(archive);
 }
 
-void ABC_free_handle(AbcArchiveHandle *handle)
+void ABC_free_handle(CacheArchiveHandle *handle)
 {
   delete archive_from_handle(handle);
 }
@@ -238,7 +244,7 @@ static std::pair<bool, AbcObjectReader *> visit_object(
 
   if (!object.valid()) {
     std::cerr << "  - " << full_name << ": object is invalid, skipping it and all its children.\n";
-    return std::make_pair(false, static_cast<AbcObjectReader *>(NULL));
+    return std::make_pair(false, static_cast<AbcObjectReader *>(nullptr));
   }
 
   /* The interpretation of data by the children determine the role of this
@@ -260,7 +266,7 @@ static std::pair<bool, AbcObjectReader *> visit_object(
     bool child_claims_this_object = child_result.first;
     AbcObjectReader *child_reader = child_result.second;
 
-    if (child_reader == NULL) {
+    if (child_reader == nullptr) {
       BLI_assert(!child_claims_this_object);
     }
     else {
@@ -275,8 +281,9 @@ static std::pair<bool, AbcObjectReader *> visit_object(
     children_claiming_this_object += child_claims_this_object ? 1 : 0;
   }
   BLI_assert(children_claiming_this_object == claiming_child_readers.size());
+  UNUSED_VARS_NDEBUG(children_claiming_this_object);
 
-  AbcObjectReader *reader = NULL;
+  AbcObjectReader *reader = nullptr;
   const MetaData &md = object.getMetaData();
   bool parent_is_part_of_this_object = false;
 
@@ -357,10 +364,7 @@ static std::pair<bool, AbcObjectReader *> visit_object(
     readers.push_back(reader);
     reader->incref();
 
-    AlembicObjectPath *abc_path = static_cast<AlembicObjectPath *>(
-        MEM_callocN(sizeof(AlembicObjectPath), "AlembicObjectPath"));
-    BLI_strncpy(abc_path->path, full_name.c_str(), sizeof(abc_path->path));
-    BLI_addtail(&settings.cache_file->object_paths, abc_path);
+    add_object_path(&settings.cache_file->object_paths, object);
 
     /* We can now assign this reader as parent for our children. */
     if (nonclaiming_child_readers.size() + assign_as_parent.size() > 0) {
@@ -420,100 +424,121 @@ struct ImportJobData {
   ViewLayer *view_layer;
   wmWindowManager *wm;
 
-  char filename[1024];
   ImportSettings settings;
 
-  ArchiveReader *archive;
-  std::vector<AbcObjectReader *> readers;
+  blender::Vector<ArchiveReader *> archives;
+  blender::Vector<AbcObjectReader *> readers;
 
-  short *stop;
-  short *do_update;
+  blender::Vector<std::string> paths;
+
+  /** Min time read from file import. */
+  chrono_t min_time = std::numeric_limits<chrono_t>::max();
+  /** Max time read from file import. */
+  chrono_t max_time = std::numeric_limits<chrono_t>::min();
+
+  bool *stop;
+  bool *do_update;
   float *progress;
 
   char error_code;
   bool was_cancelled;
   bool import_ok;
   bool is_background_job;
+  blender::timeit::TimePoint start_time;
 };
 
-static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
+static void report_job_duration(const ImportJobData *data)
 {
+  blender::timeit::Nanoseconds duration = blender::timeit::Clock::now() - data->start_time;
+  std::cout << "Alembic import took ";
+  blender::timeit::print_duration(duration);
+  std::cout << '\n';
+}
+
+static void sort_readers(blender::MutableSpan<AbcObjectReader *> readers)
+{
+  blender::parallel_sort(
+      readers.begin(), readers.end(), [](const AbcObjectReader *a, const AbcObjectReader *b) {
+        const char *na = a->name().c_str();
+        const char *nb = b->name().c_str();
+        return BLI_strcasecmp(na, nb) < 0;
+      });
+}
+
+static void import_file(ImportJobData *data, const char *filepath, float progress_factor)
+{
+  blender::timeit::TimePoint start_time = blender::timeit::Clock::now();
   SCOPE_TIMER("Alembic import, objects reading and creation");
 
-  ImportJobData *data = static_cast<ImportJobData *>(user_data);
+  ArchiveReader *archive = ArchiveReader::get(data->bmain, {filepath});
 
-  data->stop = stop;
-  data->do_update = do_update;
-  data->progress = progress;
-
-  WM_set_locked_interface(data->wm, true);
-
-  ArchiveReader *archive = new ArchiveReader(data->bmain, data->filename);
-
-  if (!archive->valid()) {
+  if (!archive || !archive->valid()) {
     data->error_code = ABC_ARCHIVE_FAIL;
     delete archive;
     return;
   }
 
   CacheFile *cache_file = static_cast<CacheFile *>(
-      BKE_cachefile_add(data->bmain, BLI_path_basename(data->filename)));
+      BKE_cachefile_add(data->bmain, BLI_path_basename(filepath)));
 
   /* Decrement the ID ref-count because it is going to be incremented for each
    * modifier and constraint that it will be attached to, so since currently
-   * it is not used by anyone, its use count will off by one. */
+   * it is not used by anyone, its use count will be off by one. */
   id_us_min(&cache_file->id);
 
   cache_file->is_sequence = data->settings.is_sequence;
   cache_file->scale = data->settings.scale;
-  STRNCPY(cache_file->filepath, data->filename);
+  STRNCPY(cache_file->filepath, filepath);
 
-  data->archive = archive;
+  data->archives.append(archive);
   data->settings.cache_file = cache_file;
 
   *data->do_update = true;
-  *data->progress = 0.05f;
+  *data->progress += 0.05f * progress_factor;
 
   /* Parse Alembic Archive. */
   AbcObjectReader::ptr_vector assign_as_parent;
-  visit_object(archive->getTop(), data->readers, data->settings, assign_as_parent);
+  std::vector<AbcObjectReader *> readers{};
+  visit_object(archive->getTop(), readers, data->settings, assign_as_parent);
 
   /* There shouldn't be any orphans. */
   BLI_assert(assign_as_parent.empty());
 
   if (G.is_break) {
     data->was_cancelled = true;
+    data->readers.extend(readers);
     return;
   }
 
   *data->do_update = true;
-  *data->progress = 0.1f;
+  *data->progress += 0.05f * progress_factor;
 
   /* Create objects and set scene frame range. */
 
-  const float size = static_cast<float>(data->readers.size());
-  size_t i = 0;
+  /* Sort readers by name: when creating a lot of objects in Blender,
+   * it is much faster if the order is sorted by name. */
+  sort_readers(readers);
+  data->readers.extend(readers);
 
-  chrono_t min_time = std::numeric_limits<chrono_t>::max();
-  chrono_t max_time = std::numeric_limits<chrono_t>::min();
+  const float size = float(readers.size());
 
-  ISampleSelector sample_sel(0.0f);
+  ISampleSelector sample_sel(0.0);
   std::vector<AbcObjectReader *>::iterator iter;
-  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+  const float read_object_progress_step = (0.6f / size) * progress_factor;
+  for (iter = readers.begin(); iter != readers.end(); ++iter) {
     AbcObjectReader *reader = *iter;
 
     if (reader->valid()) {
       reader->readObjectData(data->bmain, sample_sel);
 
-      min_time = std::min(min_time, reader->minTime());
-      max_time = std::max(max_time, reader->maxTime());
+      data->min_time = std::min(data->min_time, reader->minTime());
+      data->max_time = std::max(data->max_time, reader->maxTime());
     }
     else {
-      std::cerr << "Object " << reader->name() << " in Alembic file " << data->filename
+      std::cerr << "Object " << reader->name() << " in Alembic file " << filepath
                 << " is invalid.\n";
     }
-
-    *data->progress = 0.1f + 0.3f * (++i / size);
+    *data->progress += read_object_progress_step;
     *data->do_update = true;
 
     if (G.is_break) {
@@ -522,29 +547,14 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     }
   }
 
-  if (data->settings.set_frame_range) {
-    Scene *scene = data->scene;
-
-    if (data->settings.is_sequence) {
-      SFRA = data->settings.sequence_offset;
-      EFRA = SFRA + (data->settings.sequence_len - 1);
-      CFRA = SFRA;
-    }
-    else if (min_time < max_time) {
-      SFRA = static_cast<int>(round(min_time * FPS));
-      EFRA = static_cast<int>(round(max_time * FPS));
-      CFRA = SFRA;
-    }
-  }
-
   /* Setup parenthood. */
-  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+  for (iter = readers.begin(); iter != readers.end(); ++iter) {
     const AbcObjectReader *reader = *iter;
     const AbcObjectReader *parent_reader = reader->parent_reader;
     Object *ob = reader->object();
 
-    if (parent_reader == NULL || !reader->inherits_xform()) {
-      ob->parent = NULL;
+    if (parent_reader == nullptr || !reader->inherits_xform()) {
+      ob->parent = nullptr;
     }
     else {
       ob->parent = parent_reader->object();
@@ -552,12 +562,12 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   }
 
   /* Setup transformations and constraints. */
-  i = 0;
-  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+  const float setup_object_transform_progress_step = (0.3f / size) * progress_factor;
+  for (iter = readers.begin(); iter != readers.end(); ++iter) {
     AbcObjectReader *reader = *iter;
-    reader->setupObjectTransform(0.0f);
+    reader->setupObjectTransform(0.0);
 
-    *data->progress = 0.7f + 0.3f * (++i / size);
+    *data->progress += setup_object_transform_progress_step;
     *data->do_update = true;
 
     if (G.is_break) {
@@ -565,6 +575,51 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
       return;
     }
   }
+  blender::timeit::Nanoseconds duration = blender::timeit::Clock::now() - start_time;
+  std::cout << "Alembic import " << filepath << " took ";
+  blender::timeit::print_duration(duration);
+  std::cout << '\n';
+}
+
+static void set_frame_range(ImportJobData *data)
+{
+  if (!data->settings.set_frame_range) {
+    return;
+  }
+  Scene *scene = data->scene;
+  if (data->settings.is_sequence) {
+    scene->r.sfra = data->settings.sequence_min_frame;
+    scene->r.efra = data->settings.sequence_max_frame;
+    scene->r.cfra = scene->r.sfra;
+  }
+  else if (data->min_time < data->max_time) {
+    scene->r.sfra = int(round(data->min_time * FPS));
+    scene->r.efra = int(round(data->max_time * FPS));
+    scene->r.cfra = scene->r.sfra;
+  }
+}
+
+static void import_startjob(void *user_data, wmJobWorkerStatus *worker_status)
+{
+  ImportJobData *data = static_cast<ImportJobData *>(user_data);
+  data->stop = &worker_status->stop;
+  data->do_update = &worker_status->do_update;
+  data->progress = &worker_status->progress;
+  data->start_time = blender::timeit::Clock::now();
+
+  WM_set_locked_interface(data->wm, true);
+  float file_progress_factor = 1.0f / float(data->paths.size());
+  for (int idx : data->paths.index_range()) {
+    import_file(data, data->paths[idx].c_str(), file_progress_factor);
+
+    if (G.is_break || data->was_cancelled) {
+      data->was_cancelled = true;
+      return;
+    }
+
+    worker_status->progress = float(idx + 1) * file_progress_factor;
+  }
+  set_frame_range(data);
 }
 
 static void import_endjob(void *user_data)
@@ -573,16 +628,14 @@ static void import_endjob(void *user_data)
 
   ImportJobData *data = static_cast<ImportJobData *>(user_data);
 
-  std::vector<AbcObjectReader *>::iterator iter;
-
   /* Delete objects on cancellation. */
   if (data->was_cancelled) {
-    for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-      Object *ob = (*iter)->object();
+    for (AbcObjectReader *reader : data->readers) {
+      Object *ob = reader->object();
 
       /* It's possible that cancellation occurred between the creation of
        * the reader and the creation of the Blender object. */
-      if (ob == NULL) {
+      if (ob == nullptr) {
         continue;
       }
 
@@ -590,25 +643,28 @@ static void import_endjob(void *user_data)
     }
   }
   else {
-    /* Add object to scene. */
     Base *base;
     LayerCollection *lc;
+    const Scene *scene = data->scene;
     ViewLayer *view_layer = data->view_layer;
 
-    BKE_view_layer_base_deselect_all(view_layer);
+    BKE_view_layer_base_deselect_all(scene, view_layer);
 
     lc = BKE_layer_collection_get_active(view_layer);
 
-    for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-      Object *ob = (*iter)->object();
-
+    for (AbcObjectReader *reader : data->readers) {
+      Object *ob = reader->object();
       BKE_collection_object_add(data->bmain, lc->collection, ob);
-
+    }
+    /* Sync and do the view layer operations. */
+    BKE_view_layer_synced_ensure(scene, view_layer);
+    for (AbcObjectReader *reader : data->readers) {
+      Object *ob = reader->object();
       base = BKE_view_layer_base_find(view_layer, ob);
       /* TODO: is setting active needed? */
       BKE_view_layer_base_select_and_set_active(view_layer, base);
 
-      DEG_id_tag_update(&lc->collection->id, ID_RECALC_COPY_ON_WRITE);
+      DEG_id_tag_update(&lc->collection->id, ID_RECALC_SYNC_TO_EVAL);
       DEG_id_tag_update_ex(data->bmain,
                            &ob->id,
                            ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
@@ -625,8 +681,7 @@ static void import_endjob(void *user_data)
     }
   }
 
-  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    AbcObjectReader *reader = *iter;
+  for (AbcObjectReader *reader : data->readers) {
     reader->decref();
 
     if (reader->refcount() == 0) {
@@ -642,29 +697,24 @@ static void import_endjob(void *user_data)
       data->import_ok = !data->was_cancelled;
       break;
     case ABC_ARCHIVE_FAIL:
-      WM_report(RPT_ERROR, "Could not open Alembic archive for reading! See console for detail.");
+      WM_report(RPT_ERROR, "Could not open Alembic archive for reading, see console for detail");
       break;
   }
 
-  WM_main_add_notifier(NC_SCENE | ND_FRAME, data->scene);
+  WM_main_add_notifier(NC_ID | NA_ADDED, nullptr);
+  report_job_duration(data);
 }
 
 static void import_freejob(void *user_data)
 {
   ImportJobData *data = static_cast<ImportJobData *>(user_data);
-  delete data->archive;
+  for (ArchiveReader *archive : data->archives) {
+    delete archive;
+  }
   delete data;
 }
 
-bool ABC_import(bContext *C,
-                const char *filepath,
-                float scale,
-                bool is_sequence,
-                bool set_frame_range,
-                int sequence_len,
-                int offset,
-                bool validate_meshes,
-                bool as_background_job)
+bool ABC_import(bContext *C, const AlembicImportParams *params, bool as_background_job)
 {
   /* Using new here since MEM_* functions do not call constructor to properly initialize data. */
   ImportJobData *job = new ImportJobData();
@@ -674,17 +724,17 @@ bool ABC_import(bContext *C,
   job->view_layer = CTX_data_view_layer(C);
   job->wm = CTX_wm_manager(C);
   job->import_ok = false;
-  BLI_strncpy(job->filename, filepath, 1024);
+  job->paths = params->paths;
 
-  job->settings.scale = scale;
-  job->settings.is_sequence = is_sequence;
-  job->settings.set_frame_range = set_frame_range;
-  job->settings.sequence_len = sequence_len;
-  job->settings.sequence_offset = offset;
-  job->settings.validate_meshes = validate_meshes;
+  job->settings.scale = params->global_scale;
+  job->settings.is_sequence = params->is_sequence;
+  job->settings.set_frame_range = params->set_frame_range;
+  job->settings.sequence_min_frame = params->sequence_min_frame;
+  job->settings.sequence_max_frame = params->sequence_max_frame;
+  job->settings.validate_meshes = params->validate_meshes;
+  job->settings.always_add_cache_reader = params->always_add_cache_reader;
   job->error_code = ABC_NO_ERROR;
   job->was_cancelled = false;
-  job->archive = NULL;
   job->is_background_job = as_background_job;
 
   G.is_break = false;
@@ -696,21 +746,18 @@ bool ABC_import(bContext *C,
                                 job->scene,
                                 "Alembic Import",
                                 WM_JOB_PROGRESS,
-                                WM_JOB_TYPE_ALEMBIC);
+                                WM_JOB_TYPE_ALEMBIC_IMPORT);
 
     /* setup job */
     WM_jobs_customdata_set(wm_job, job, import_freejob);
     WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_FRAME, NC_SCENE | ND_FRAME);
-    WM_jobs_callbacks(wm_job, import_startjob, NULL, NULL, import_endjob);
+    WM_jobs_callbacks(wm_job, import_startjob, nullptr, nullptr, import_endjob);
 
     WM_jobs_start(CTX_wm_manager(C), wm_job);
   }
   else {
-    /* Fake a job context, so that we don't need NULL pointer checks while importing. */
-    short stop = 0, do_update = 0;
-    float progress = 0.f;
-
-    import_startjob(job, &stop, &do_update, &progress);
+    wmJobWorkerStatus worker_status = {};
+    import_startjob(job, &worker_status);
     import_endjob(job);
     import_ok = job->import_ok;
 
@@ -722,7 +769,7 @@ bool ABC_import(bContext *C,
 
 /* ************************************************************************** */
 
-void ABC_get_transform(CacheReader *reader, float r_mat_world[4][4], float time, float scale)
+void ABC_get_transform(CacheReader *reader, float r_mat_world[4][4], double time, float scale)
 {
   if (!reader) {
     return;
@@ -735,7 +782,7 @@ void ABC_get_transform(CacheReader *reader, float r_mat_world[4][4], float time,
   /* Convert from the local matrix we obtain from Alembic to world coordinates
    * for Blender. This conversion is done here rather than by Blender due to
    * work around the non-standard interpretation of CONSTRAINT_SPACE_LOCAL in
-   * BKE_constraint_mat_convertspace().  */
+   * BKE_constraint_mat_convertspace(). */
   Object *object = abc_reader->object();
   if (object->parent == nullptr) {
     /* No parent, so local space is the same as world space. */
@@ -754,53 +801,60 @@ void ABC_get_transform(CacheReader *reader, float r_mat_world[4][4], float time,
 
 /* ************************************************************************** */
 
-static AbcObjectReader *get_abc_reader(CacheReader *reader, Object *ob, const char **err_str)
+static AbcObjectReader *get_abc_reader(CacheReader *reader, Object *ob, const char **r_err_str)
 {
   AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
   IObject iobject = abc_reader->iobject();
 
   if (!iobject.valid()) {
-    *err_str = "Invalid object: verify object path";
-    return NULL;
+    *r_err_str = RPT_("Invalid object: verify object path");
+    return nullptr;
   }
 
   const ObjectHeader &header = iobject.getHeader();
-  if (!abc_reader->accepts_object_type(header, ob, err_str)) {
-    /* err_str is set by acceptsObjectType() */
-    return NULL;
+  if (!abc_reader->accepts_object_type(header, ob, r_err_str)) {
+    /* r_err_str is set by acceptsObjectType() */
+    return nullptr;
   }
 
   return abc_reader;
 }
 
-static ISampleSelector sample_selector_for_time(float time)
+static ISampleSelector sample_selector_for_time(chrono_t time)
 {
   /* kFloorIndex is used to be compatible with non-interpolating
    * properties; they use the floor. */
   return ISampleSelector(time, ISampleSelector::kFloorIndex);
 }
 
-Mesh *ABC_read_mesh(CacheReader *reader,
-                    Object *ob,
-                    Mesh *existing_mesh,
-                    const float time,
-                    const char **err_str,
-                    int read_flag)
+void ABC_read_geometry(CacheReader *reader,
+                       Object *ob,
+                       blender::bke::GeometrySet &geometry_set,
+                       const ABCReadParams *params,
+                       const char **r_err_str)
 {
-  AbcObjectReader *abc_reader = get_abc_reader(reader, ob, err_str);
-  if (abc_reader == NULL) {
-    return NULL;
+  AbcObjectReader *abc_reader = get_abc_reader(reader, ob, r_err_str);
+  if (abc_reader == nullptr) {
+    return;
   }
 
-  ISampleSelector sample_sel = sample_selector_for_time(time);
-  return abc_reader->read_mesh(existing_mesh, sample_sel, read_flag, err_str);
+  ISampleSelector sample_sel = sample_selector_for_time(params->time);
+  return abc_reader->read_geometry(geometry_set,
+                                   sample_sel,
+                                   params->read_flags,
+                                   params->velocity_name,
+                                   params->velocity_scale,
+                                   r_err_str);
 }
 
-bool ABC_mesh_topology_changed(
-    CacheReader *reader, Object *ob, Mesh *existing_mesh, const float time, const char **err_str)
+bool ABC_mesh_topology_changed(CacheReader *reader,
+                               Object *ob,
+                               const Mesh *existing_mesh,
+                               const double time,
+                               const char **r_err_str)
 {
-  AbcObjectReader *abc_reader = get_abc_reader(reader, ob, err_str);
-  if (abc_reader == NULL) {
+  AbcObjectReader *abc_reader = get_abc_reader(reader, ob, r_err_str);
+  if (abc_reader == nullptr) {
     return false;
   }
 
@@ -810,7 +864,7 @@ bool ABC_mesh_topology_changed(
 
 /* ************************************************************************** */
 
-void CacheReader_free(CacheReader *reader)
+void ABC_CacheReader_free(CacheReader *reader)
 {
   AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
   abc_reader->decref();
@@ -820,16 +874,11 @@ void CacheReader_free(CacheReader *reader)
   }
 }
 
-void CacheReader_incref(CacheReader *reader)
-{
-  AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
-  abc_reader->incref();
-}
-
-CacheReader *CacheReader_open_alembic_object(AbcArchiveHandle *handle,
+CacheReader *CacheReader_open_alembic_object(CacheArchiveHandle *handle,
                                              CacheReader *reader,
                                              Object *object,
-                                             const char *object_path)
+                                             const char *object_path,
+                                             const bool is_sequence)
 {
   if (object_path[0] == '\0') {
     return reader;
@@ -845,14 +894,15 @@ CacheReader *CacheReader_open_alembic_object(AbcArchiveHandle *handle,
   find_iobject(archive->getTop(), iobject, object_path);
 
   if (reader) {
-    CacheReader_free(reader);
+    ABC_CacheReader_free(reader);
   }
 
   ImportSettings settings;
+  settings.is_sequence = is_sequence;
   AbcObjectReader *abc_reader = create_reader(iobject, settings);
-  if (abc_reader == NULL) {
+  if (abc_reader == nullptr) {
     /* This object is not supported */
-    return NULL;
+    return nullptr;
   }
   abc_reader->object(object);
   abc_reader->incref();

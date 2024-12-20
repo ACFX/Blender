@@ -1,13 +1,16 @@
-#ifndef VOLUMETRICS
-void node_bsdf_translucent(vec4 color, vec3 N, out Closure result)
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+void node_bsdf_translucent(vec4 color, vec3 N, float weight, out Closure result)
 {
-  N = normalize(N);
-  result = CLOSURE_DEFAULT;
-  eevee_closure_diffuse(-N, color.rgb, 1.0, false, result.radiance);
-  closure_load_ssr_data(vec3(0.0), 0.0, N, viewCameraVec, -1, result);
-  result.radiance = render_pass_diffuse_mask(color.rgb, result.radiance * color.rgb);
+  color = max(color, vec4(0.0));
+  N = safe_normalize(N);
+
+  ClosureTranslucent translucent_data;
+  translucent_data.weight = weight;
+  translucent_data.color = color.rgb;
+  translucent_data.N = N;
+
+  result = closure_eval(translucent_data);
 }
-#else
-/* Stub translucent because it is not compatible with volumetrics. */
-#  define node_bsdf_translucent(a, b, c) (c = CLOSURE_DEFAULT)
-#endif

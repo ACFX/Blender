@@ -1,39 +1,55 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  *
- * Use API in BKE_workspace.h to edit these.
+ * Use API in BKE_workspace.hh to edit these.
  */
 
-#ifndef __DNA_WORKSPACE_TYPES_H__
-#define __DNA_WORKSPACE_TYPES_H__
+#pragma once
 
-#include "DNA_scene_types.h"
+#include "DNA_ID.h"
+#include "DNA_asset_types.h"
+#include "DNA_viewer_path_types.h"
+
+#ifdef __cplusplus
+namespace blender::bke {
+struct WorkSpaceRuntime;
+}
+using WorkSpaceRuntimeHandle = blender::bke::WorkSpaceRuntime;
+#else
+typedef struct WorkSpaceRuntimeHandle WorkSpaceRuntimeHandle;
+#endif
+
+/** #bToolRef_Runtime.flag */
+enum {
+  /**
+   * This tool should use the fallback key-map.
+   * Typically gizmos handle this but some tools (such as the knife tool) don't use a gizmo.
+   */
+  TOOLREF_FLAG_FALLBACK_KEYMAP = (1 << 0),
+  TOOLREF_FLAG_USE_BRUSHES = (1 << 1),
+};
 
 #
 #
 typedef struct bToolRef_Runtime {
   int cursor;
 
-  /** One of these 3 must be defined. */
+  /** One of these 4 must be defined. */
   char keymap[64];
   char gizmo_group[64];
   char data_block[64];
+  /**
+   * The brush type this tool is limited too, if #TOOLREF_FLAG_USE_BRUSHES is set. Note that this
+   * is a different enum in different modes, e.g. #eBrushSculptType in sculpt mode,
+   * #eBrushVertexPaintType in vertex paint mode.
+   *
+   *  -1 means any brush type may be used (0 is used by brush type enums of some modes).
+   */
+  int brush_type;
 
   /** Keymap for #bToolRef.idname_fallback, if set. */
   char keymap_fallback[64];
@@ -43,9 +59,13 @@ typedef struct bToolRef_Runtime {
 
   /** Index when a tool is a member of a group. */
   int index;
+  /** Options: `TOOLREF_FLAG_*`. */
+  int flag;
 } bToolRef_Runtime;
 
-/* Stored per mode. */
+/**
+ * \note Stored per mode.
+ */
 typedef struct bToolRef {
   struct bToolRef *next, *prev;
   char idname[64];
@@ -56,11 +76,13 @@ typedef struct bToolRef {
   /** Use to avoid initializing the same tool multiple times. */
   short tag;
 
-  /** #bToolKey (spacetype, mode), used in 'WM_api.h' */
+  /** #bToolKey (space-type, mode), used in 'WM_api.hh' */
   short space_type;
   /**
-   * Value depends on the 'space_type', object mode for 3D view, image editor has own mode too.
+   * Value depends on the 'space_type', object mode for 3D view, image editor has its own mode too.
    * RNA needs to handle using item function.
+   *
+   * See: #eSpaceImageMode for SPACE_IMAGE, #eContextObjectMode for SPACE_VIEW3D, etc
    */
   int mode;
 
@@ -99,8 +121,8 @@ typedef struct WorkSpaceLayout {
 /** Optional tags, which features to use, aligned with #bAddon names by convention. */
 typedef struct wmOwnerID {
   struct wmOwnerID *next, *prev;
-  /** MAX_NAME. */
-  char name[64];
+  /** Optional, see: #wmOwnerID. */
+  char name[128];
 } wmOwnerID;
 
 typedef struct WorkSpace {
@@ -120,6 +142,10 @@ typedef struct WorkSpace {
   /** List of #bToolRef */
   ListBase tools;
 
+  /** Optional, scene to switch to when enabling this workspace (NULL to disable). Cleared on
+   * link/append. */
+  struct Scene *pin_scene;
+
   char _pad[4];
 
   int object_mode;
@@ -131,7 +157,18 @@ typedef struct WorkSpace {
   int order;
 
   /** Info text from modal operators (runtime). */
-  char *status_text;
+  WorkSpaceRuntimeHandle *runtime;
+
+  /** Workspace-wide active asset library, for asset UIs to use (e.g. asset view UI template). The
+   * Asset Browser has its own and doesn't use this. */
+  AssetLibraryReference asset_library_ref;
+
+  /**
+   * Ground truth for the currently active viewer node. When a viewer node is activated its path is
+   * set here. Editors can check here for which node is active (currently the node editor,
+   * spreadsheet and viewport do this).
+   */
+  ViewerPath viewer_path;
 } WorkSpace;
 
 /**
@@ -161,10 +198,15 @@ typedef struct WorkSpaceDataRelation {
   struct WorkSpaceDataRelation *next, *prev;
 
   /** The data used to identify the relation
-   * (e.g. to find screen-layout (= value) from/for a hook). */
+   * (e.g. to find screen-layout (= value) from/for a hook).
+   * NOTE: Now runtime only. */
   void *parent;
   /** The value for this parent-data/workspace relation. */
   void *value;
+
+  /** Reference to the actual parent window, #wmWindow.winid. Used in read/write code. */
+  int parentid;
+  char _pad_0[4];
 } WorkSpaceDataRelation;
 
 /**
@@ -175,14 +217,15 @@ typedef struct WorkSpaceInstanceHook {
   WorkSpace *active;
   struct WorkSpaceLayout *act_layout;
 
-  /** Needed because we can't change workspaces/layouts in running handler loop,
-   * it would break context. */
+  /**
+   * Needed because we can't change work-spaces/layouts in running handler loop,
+   * it would break context.
+   */
   WorkSpace *temp_workspace_store;
   struct WorkSpaceLayout *temp_layout_store;
 } WorkSpaceInstanceHook;
 
 typedef enum eWorkSpaceFlags {
   WORKSPACE_USE_FILTER_BY_ORIGIN = (1 << 1),
+  WORKSPACE_USE_PIN_SCENE = (1 << 2),
 } eWorkSpaceFlags;
-
-#endif /* __DNA_WORKSPACE_TYPES_H__ */

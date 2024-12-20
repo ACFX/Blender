@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2010-2022 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 import sys
 
@@ -27,11 +30,7 @@ def main():
     rna_api_new = []
 
     for key, val_orig in mod_to_dict.items():
-        try:
-            val_new = mod_from_dict.pop(key)
-        except:
-            # print("not found", key)
-            val_new = val_orig
+        val_new = mod_from_dict.pop(key, val_orig)
 
         # always take the class from the base
         val = list(val_orig)
@@ -56,7 +55,10 @@ def main():
     if mod_from_dict:
         file_path = sys.argv[-2][:-3] + "_lost.py"
         write_work_file(file_path, list(mod_from_dict.values()))
-        print("Warning '%s' contains lost %d items from module %s.py" % (file_path, len(mod_from_dict), mod_from.__name__))
+        print(
+            "Warning '%s' contains lost %d items from module %s.py" %
+            (file_path, len(mod_from_dict), mod_from.__name__)
+        )
 
 
 if __name__ == "__main__":

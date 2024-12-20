@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -21,9 +9,9 @@
 #include "abc_writer_camera.h"
 #include "abc_hierarchy_iterator.h"
 
-#include "BKE_camera.h"
+#include "BKE_scene.hh"
 
-#include "BLI_assert.h"
+#include "DEG_depsgraph_query.hh"
 
 #include "DNA_camera_types.h"
 #include "DNA_scene_types.h"
@@ -31,21 +19,17 @@
 #include "CLG_log.h"
 static CLG_LogRef LOG = {"io.alembic"};
 
-namespace blender {
-namespace io {
-namespace alembic {
+namespace blender::io::alembic {
 
 using Alembic::AbcGeom::CameraSample;
 using Alembic::AbcGeom::OCamera;
 using Alembic::AbcGeom::OFloatProperty;
 
-ABCCameraWriter::ABCCameraWriter(const ABCWriterConstructorArgs &args) : ABCAbstractWriter(args)
-{
-}
+ABCCameraWriter::ABCCameraWriter(const ABCWriterConstructorArgs &args) : ABCAbstractWriter(args) {}
 
 bool ABCCameraWriter::is_supported(const HierarchyContext *context) const
 {
-  Camera *camera = static_cast<Camera *>(context->object->data);
+  const Camera *camera = static_cast<const Camera *>(context->object->data);
   return camera->type == CAM_PERSP;
 }
 
@@ -60,16 +44,31 @@ void ABCCameraWriter::create_alembic_objects(const HierarchyContext * /*context*
       abc_custom_data_container_, "stereoDistance", timesample_index_);
   abc_eye_separation_ = OFloatProperty(
       abc_custom_data_container_, "eyeSeparation", timesample_index_);
+
+  /* Export scene render resolution on cameras as userProperties, for other software (e.g.
+   * Houdini). */
+  OFloatProperty render_resx(abc_custom_data_container_, "resx");
+  OFloatProperty render_resy(abc_custom_data_container_, "resy");
+  Scene *scene = DEG_get_evaluated_scene(args_.depsgraph);
+  int width, height;
+  BKE_render_resolution(&scene->r, false, &width, &height);
+  render_resx.set(float(width));
+  render_resy.set(float(height));
 }
 
-const Alembic::Abc::OObject ABCCameraWriter::get_alembic_object() const
+Alembic::Abc::OObject ABCCameraWriter::get_alembic_object() const
 {
   return abc_camera_;
 }
 
+Alembic::Abc::OCompoundProperty ABCCameraWriter::abc_prop_for_custom_props()
+{
+  return abc_schema_prop_for_custom_props(abc_camera_schema_);
+}
+
 void ABCCameraWriter::do_write(HierarchyContext &context)
 {
-  Camera *cam = static_cast<Camera *>(context.object->data);
+  const Camera *cam = static_cast<const Camera *>(context.object->data);
 
   abc_stereo_distance_.set(cam->stereo.convergence_distance);
   abc_eye_separation_.set(cam->stereo.interocular_distance);
@@ -105,6 +104,4 @@ void ABCCameraWriter::do_write(HierarchyContext &context)
   abc_camera_schema_.set(camera_sample);
 }
 
-}  // namespace alembic
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::alembic

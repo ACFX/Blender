@@ -35,8 +35,11 @@
 #define CERES_INTERNAL_DYNAMIC_SPARSE_NORMAL_CHOLESKY_SOLVER_H_
 
 // This include must come before any #ifndef check on Ceres compile options.
-#include "ceres/internal/port.h"
+// clang-format off
+#include "ceres/internal/config.h"
+// clang-format on
 
+#include "ceres/internal/export.h"
 #include "ceres/linear_solver.h"
 
 namespace ceres {
@@ -51,31 +54,25 @@ class CompressedRowSparseMatrix;
 //
 // TODO(alex): Add support for Accelerate sparse solvers:
 // https://github.com/ceres-solver/ceres-solver/issues/397
-class DynamicSparseNormalCholeskySolver
+class CERES_NO_EXPORT DynamicSparseNormalCholeskySolver
     : public CompressedRowSparseMatrixSolver {
  public:
-  explicit DynamicSparseNormalCholeskySolver(
-      const LinearSolver::Options& options);
-  virtual ~DynamicSparseNormalCholeskySolver() {}
+  explicit DynamicSparseNormalCholeskySolver(LinearSolver::Options options);
 
  private:
-  LinearSolver::Summary SolveImpl(
-      CompressedRowSparseMatrix* A,
-      const double* b,
-      const LinearSolver::PerSolveOptions& options,
-      double* x) final;
+  LinearSolver::Summary SolveImpl(CompressedRowSparseMatrix* A,
+                                  const double* b,
+                                  const LinearSolver::PerSolveOptions& options,
+                                  double* x) final;
 
-  LinearSolver::Summary SolveImplUsingSuiteSparse(
-      CompressedRowSparseMatrix* A,
-      double* rhs_and_solution);
+  LinearSolver::Summary SolveImplUsingSuiteSparse(CompressedRowSparseMatrix* A,
+                                                  double* rhs_and_solution);
 
-  LinearSolver::Summary SolveImplUsingCXSparse(
-      CompressedRowSparseMatrix* A,
-      double* rhs_and_solution);
+  LinearSolver::Summary SolveImplUsingCXSparse(CompressedRowSparseMatrix* A,
+                                               double* rhs_and_solution);
 
-  LinearSolver::Summary SolveImplUsingEigen(
-      CompressedRowSparseMatrix* A,
-      double* rhs_and_solution);
+  LinearSolver::Summary SolveImplUsingEigen(CompressedRowSparseMatrix* A,
+                                            double* rhs_and_solution);
 
   const LinearSolver::Options options_;
 };

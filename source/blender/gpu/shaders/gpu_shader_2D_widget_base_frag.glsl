@@ -1,17 +1,12 @@
-uniform vec3 checkerColorAndSize;
+/* SPDX-FileCopyrightText: 2018-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-noperspective in vec2 uvInterp;
-noperspective in float butCo;
-flat in float discardFac;
-flat in float shadeTri;
-flat in vec2 outRectSize;
-flat in vec4 outRoundCorners;
-noperspective in vec4 innerColor;
-flat in vec4 borderColor;
-flat in vec4 embossColor;
-flat in float lineWidth;
+#include "infos/gpu_shader_2D_widget_info.hh"
 
-out vec4 fragColor;
+#include "gpu_shader_colorspace_lib.glsl"
+
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_2D_widget_shared)
 
 vec3 compute_masks(vec2 uv)
 {
@@ -19,9 +14,9 @@ vec3 compute_masks(vec2 uv)
   bool right_half = uv.x > outRectSize.x * 0.5;
   float corner_rad;
 
-  /* Correct aspect ratio for 2D views not using uniform scalling.
+  /* Correct aspect ratio for 2D views not using uniform scaling.
    * uv is already in pixel space so a uniform scale should give us a ratio of 1. */
-  float ratio = (butCo != -2.0) ? (dFdy(uv.y) / dFdx(uv.x)) : 1.0;
+  float ratio = (butCo != -2.0) ? abs(dFdy(uv.y) / dFdx(uv.x)) : 1.0;
   vec2 uv_sdf = uv;
   uv_sdf.x *= ratio;
 
@@ -36,15 +31,15 @@ vec3 compute_masks(vec2 uv)
     corner_rad = right_half ? outRoundCorners.y : outRoundCorners.x;
   }
 
+  /* Fade emboss at the border. */
+  float emboss_size = upper_half ? 0.0 : min(1.0, uv_sdf.x / (corner_rad * ratio));
+
   /* Signed distance field from the corner (in pixel).
    * inner_sdf is sharp and outer_sdf is rounded. */
   uv_sdf -= corner_rad;
   float inner_sdf = max(0.0, min(uv_sdf.x, uv_sdf.y));
   float outer_sdf = -length(min(uv_sdf, 0.0));
   float sdf = inner_sdf + outer_sdf + corner_rad;
-
-  /* Fade emboss at the border. */
-  float emboss_size = clamp((upper_half) ? 0.0 : (uv.x / corner_rad), 0.0, 1.0);
 
   /* Clamp line width to be at least 1px wide. This can happen if the projection matrix
    * has been scaled (i.e: Node editor)... */
@@ -96,14 +91,14 @@ void main()
     fragColor.a = 1.0;
   }
   else {
-    /* Premultiply here. */
+    /* Pre-multiply here. */
     fragColor = innerColor * vec4(innerColor.aaa, 1.0);
   }
   fragColor *= masks.y;
   fragColor += masks.x * borderColor;
   fragColor += masks.z * embossColor;
 
-  /* Un-premult because the blend equation is already doing the mult. */
+  /* Un-pre-multiply because the blend equation is already doing the multiplication. */
   if (fragColor.a > 0.0) {
     fragColor.rgb /= fragColor.a;
   }

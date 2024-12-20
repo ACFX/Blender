@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_BASIC_STROKE_SHADERS_H__
-#define __FREESTYLE_BASIC_STROKE_SHADERS_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -48,32 +35,30 @@ namespace StrokeShaders {
 //
 //////////////////////////////////////////////////////
 
-/*! [ Thickness Shader ].
+/** [ Thickness Shader ].
  *  Assigns an absolute constant thickness to every vertices of the Stroke.
  */
 class ConstantThicknessShader : public StrokeShader {
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param thickness:
    *    The thickness that must be assigned to the stroke.
    */
-  ConstantThicknessShader(float thickness) : StrokeShader()
+  ConstantThicknessShader(float thickness)
   {
     _thickness = thickness;
   }
 
-  /*! Destructor. */
-  virtual ~ConstantThicknessShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~ConstantThicknessShader() {}
 
-  /*! Returns the string "ConstantThicknessShader".*/
+  /** Returns the string "ConstantThicknessShader". */
   virtual string getName() const
   {
     return "ConstantThicknessShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 
  private:
@@ -83,18 +68,16 @@ class ConstantThicknessShader : public StrokeShader {
 /* [ Thickness Shader ].
  *  Assigns an absolute constant external thickness to every vertices of the Stroke. The external
  * thickness of a point is its thickness from the point to the strip border in the direction
- * pointing outside the object the Stroke delimitates.
+ * pointing outside the object the Stroke delimiters.
  */
 class ConstantExternThicknessShader : public StrokeShader {
  public:
-  ConstantExternThicknessShader(float thickness) : StrokeShader()
+  ConstantExternThicknessShader(float thickness)
   {
     _thickness = thickness;
   }
 
-  virtual ~ConstantExternThicknessShader()
-  {
-  }
+  virtual ~ConstantExternThicknessShader() {}
 
   virtual string getName() const
   {
@@ -107,7 +90,7 @@ class ConstantExternThicknessShader : public StrokeShader {
   float _thickness;
 };
 
-/*! [ Thickness Shader ].
+/** [ Thickness Shader ].
  *  Assigns thicknesses values such as the thickness increases from a thickness value A to a
  * thickness value B between the first vertex to the midpoint vertex and then decreases from B to a
  * A between this midpoint vertex and the last vertex. The thickness is linearly interpolated from
@@ -115,29 +98,27 @@ class ConstantExternThicknessShader : public StrokeShader {
  */
 class IncreasingThicknessShader : public StrokeShader {
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iThicknessMin:
    *    The first thickness value.
    *  \param iThicknessMax:
    *    The second thickness value.
    */
-  IncreasingThicknessShader(float iThicknessMin, float iThicknessMax) : StrokeShader()
+  IncreasingThicknessShader(float iThicknessMin, float iThicknessMax)
   {
     _ThicknessMin = iThicknessMin;
     _ThicknessMax = iThicknessMax;
   }
 
-  /*! Destructor.*/
-  virtual ~IncreasingThicknessShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~IncreasingThicknessShader() {}
 
   virtual string getName() const
   {
     return "IncreasingThicknessShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 
  private:
@@ -145,7 +126,7 @@ class IncreasingThicknessShader : public StrokeShader {
   float _ThicknessMax;
 };
 
-/*! [ Thickness shader ].
+/** [ Thickness shader ].
  *  Same as previous but here we allow the user to control the ratio thickness/length so that  we
  * don't get fat short lines
  */
@@ -156,7 +137,7 @@ class ConstrainedIncreasingThicknessShader : public StrokeShader {
   float _ratio;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iThicknessMin:
    *    The first thickness value.
    *  \param iThicknessMax:
@@ -165,24 +146,22 @@ class ConstrainedIncreasingThicknessShader : public StrokeShader {
    *    The ration thickness/length we don't want to exceed.
    */
   ConstrainedIncreasingThicknessShader(float iThicknessMin, float iThicknessMax, float iRatio)
-      : StrokeShader()
+
   {
     _ThicknessMin = iThicknessMin;
     _ThicknessMax = iThicknessMax;
     _ratio = iRatio;
   }
 
-  /*! Destructor.*/
-  virtual ~ConstrainedIncreasingThicknessShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~ConstrainedIncreasingThicknessShader() {}
 
   virtual string getName() const
   {
     return "ConstrainedIncreasingThicknessShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 };
 
@@ -200,15 +179,13 @@ class LengthDependingThicknessShader : public StrokeShader {
   // l < 50
 
  public:
-  LengthDependingThicknessShader(float iMinThickness, float iMaxThickness) : StrokeShader()
+  LengthDependingThicknessShader(float iMinThickness, float iMaxThickness)
   {
     _minThickness = iMinThickness;
     _maxThickness = iMaxThickness;
   }
 
-  virtual ~LengthDependingThicknessShader()
-  {
-  }
+  virtual ~LengthDependingThicknessShader() {}
 
   virtual string getName() const
   {
@@ -218,7 +195,7 @@ class LengthDependingThicknessShader : public StrokeShader {
   virtual int shade(Stroke &stroke) const;
 };
 
-/*!  [ Thickness Shader ].
+/**  [ Thickness Shader ].
  *   Adds some noise to the stroke thickness.
  *   \see \htmlonly <a href=noise/noise.html>noise/noise.html</a>\endhtmlonly
  */
@@ -230,7 +207,7 @@ class ThicknessNoiseShader : public StrokeShader {
  public:
   ThicknessNoiseShader();
 
-  /*! Builds a Thickness Noise Shader
+  /** Builds a Thickness Noise Shader
    *    \param iAmplitude:
    *      The amplitude of the noise signal
    *    \param iPeriod:
@@ -243,7 +220,7 @@ class ThicknessNoiseShader : public StrokeShader {
     return "ThicknessNoiseShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 };
 
@@ -251,12 +228,12 @@ class ThicknessNoiseShader : public StrokeShader {
 //  Color shaders
 //
 /////////////////////////////////////////////////////////
-/*!  [ Color Shader ].
+/**  [ Color Shader ].
  *   Assigns a constant color to every vertices of the Stroke.
  */
 class ConstantColorShader : public StrokeShader {
  public:
-  /*! Builds the shader from a user-specified color.
+  /** Builds the shader from a user-specified color.
    *  \param iR:
    *    The red component
    *  \param iG:
@@ -266,7 +243,7 @@ class ConstantColorShader : public StrokeShader {
    *  \param iAlpha:
    *    The alpha value
    */
-  ConstantColorShader(float iR, float iG, float iB, float iAlpha = 1.0f) : StrokeShader()
+  ConstantColorShader(float iR, float iG, float iB, float iAlpha = 1.0f)
   {
     _color[0] = iR;
     _color[1] = iG;
@@ -279,14 +256,14 @@ class ConstantColorShader : public StrokeShader {
     return "ConstantColorShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 
  private:
   float _color[4];
 };
 
-/*!  [ Color Shader ].
+/**  [ Color Shader ].
  *   Assigns a varying color to the stroke.
  *   The user specifies 2 colors A and B. The stroke color will change linearly from A to B between
  * the first and the last vertex.
@@ -297,7 +274,7 @@ class IncreasingColorShader : public StrokeShader {
   float _colorMax[4];
 
  public:
-  /*! Builds the shader from 2 user-specified colors.
+  /** Builds the shader from 2 user-specified colors.
    *  \param iRm:
    *    The first color red component
    *  \param iGm:
@@ -323,7 +300,7 @@ class IncreasingColorShader : public StrokeShader {
                         float iGM,
                         float iBM,
                         float iAlphaM)
-      : StrokeShader()
+
   {
     _colorMin[0] = iRm;
     _colorMin[1] = iGm;
@@ -341,7 +318,7 @@ class IncreasingColorShader : public StrokeShader {
     return "IncreasingColorShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 };
 
@@ -354,7 +331,7 @@ class MaterialColorShader : public StrokeShader {
   float _coefficient;
 
  public:
-  MaterialColorShader(float coeff = 1.0f) : StrokeShader()
+  MaterialColorShader(float coeff = 1.0f)
   {
     _coefficient = coeff;
   }
@@ -367,7 +344,7 @@ class MaterialColorShader : public StrokeShader {
   virtual int shade(Stroke &stroke) const;
 };
 
-/*! [ Color Shader ].
+/** [ Color Shader ].
  *  Shader to add noise to the stroke colors.
  */
 class ColorNoiseShader : public StrokeShader {
@@ -378,7 +355,7 @@ class ColorNoiseShader : public StrokeShader {
  public:
   ColorNoiseShader();
 
-  /*! Builds a Color Noise Shader
+  /** Builds a Color Noise Shader
    *    \param iAmplitude:
    *      The amplitude of the noise signal
    *    \param iPeriod:
@@ -391,7 +368,7 @@ class ColorNoiseShader : public StrokeShader {
     return "ColorNoiseShader";
   }
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &stroke) const;
 };
 
@@ -399,7 +376,7 @@ class ColorNoiseShader : public StrokeShader {
 //  Geometry Shaders
 //
 ///////////////////////////////////////////////////////////////////////////////
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Stretches the stroke at its two extremities and following the respective directions: v(1)v(0)
  * and v(n-1)v(n).
  */
@@ -408,11 +385,11 @@ class BackboneStretcherShader : public StrokeShader {
   float _amount;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iAmount:
    *    The stretching amount value.
    */
-  BackboneStretcherShader(float iAmount = 2.0f) : StrokeShader()
+  BackboneStretcherShader(float iAmount = 2.0f)
   {
     _amount = iAmount;
   }
@@ -422,11 +399,11 @@ class BackboneStretcherShader : public StrokeShader {
     return "BackboneStretcherShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
-/*! [ Geometry Shader. ]
+/** [ Geometry Shader. ]
  *  Resamples the stroke.
  * \see Stroke::Resample(float).
  */
@@ -435,11 +412,11 @@ class SamplingShader : public StrokeShader {
   float _sampling;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param sampling:
    *    The sampling to use for the stroke resampling
    */
-  SamplingShader(float sampling) : StrokeShader()
+  SamplingShader(float sampling)
   {
     _sampling = sampling;
   }
@@ -449,7 +426,7 @@ class SamplingShader : public StrokeShader {
     return "SamplingShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
@@ -458,7 +435,7 @@ class ExternalContourStretcherShader : public StrokeShader {
   float _amount;
 
  public:
-  ExternalContourStretcherShader(float iAmount = 2.0f) : StrokeShader()
+  ExternalContourStretcherShader(float iAmount = 2.0f)
   {
     _amount = iAmount;
   }
@@ -472,7 +449,7 @@ class ExternalContourStretcherShader : public StrokeShader {
 };
 
 // Bezier curve stroke shader
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Transforms the stroke backbone geometry so that it corresponds to a Bezier Curve approximation
  * of the original backbone geometry. \see \htmlonly <a
  * href=bezier/bezier.html>bezier/bezier.html</a> \endhtmlonly
@@ -482,12 +459,12 @@ class BezierCurveShader : public StrokeShader {
   float _error;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param error:
    *    The error we're allowing for the approximation.
    *    This error is the max distance allowed between the new curve and the original geometry.
    */
-  BezierCurveShader(float error = 4.0) : StrokeShader()
+  BezierCurveShader(float error = 4.0)
   {
     _error = error;
   }
@@ -497,11 +474,11 @@ class BezierCurveShader : public StrokeShader {
     return "BezierCurveShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Shader to modify the Stroke geometry so that it looks more "polygonal".
  *  The basic idea is to start from the minimal stroke approximation consisting in a line joining
  * the first vertex to the last one and to subdivide using the original stroke vertices until a
@@ -512,13 +489,13 @@ class PolygonalizationShader : public StrokeShader {
   float _error;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iError:
    *    The error we want our polygonal approximation to have with respect to the original
    * geometry. The smaller, the closer the new stroke to the original one.
    * This error corresponds * to the maximum distance between the new stroke and the old one.
    */
-  PolygonalizationShader(float iError) : StrokeShader()
+  PolygonalizationShader(float iError)
   {
     _error = iError;
   }
@@ -528,11 +505,11 @@ class PolygonalizationShader : public StrokeShader {
     return "PolygonalizationShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Shader to modify the Stroke geometry so that it corresponds to its main direction line.
  *  This shader must be used together with the splitting operator using the curvature criterion.
  *  Indeed, the precision of the approximation will depend on the size of the stroke's pieces.
@@ -543,13 +520,13 @@ class GuidingLinesShader : public StrokeShader {
   float _offset;
 
  public:
-  /*! Builds a Guiding Lines shader
+  /** Builds a Guiding Lines shader
    *    \param iOffset:
    *      The line that replaces the stroke is initially in the middle of the initial stroke
    * "bbox". iOffset is the value of the displacement which is applied to this line along its
    * normal.
    */
-  GuidingLinesShader(float iOffset) : StrokeShader()
+  GuidingLinesShader(float iOffset)
   {
     _offset = iOffset;
   }
@@ -559,27 +536,25 @@ class GuidingLinesShader : public StrokeShader {
     return "GuidingLinesShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Removes the stroke's extremities.
  */
 class TipRemoverShader : public StrokeShader {
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param tipLength:
    *    The length of the piece of stroke we want to remove at each extremity.
    */
   TipRemoverShader(real tipLength);
 
-  /*! Destructor. */
-  virtual ~TipRemoverShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~TipRemoverShader() {}
 
-  /*! The shading method */
+  /** The shading method */
   virtual string getName() const
   {
     return "TipRemoverShader";
@@ -591,34 +566,35 @@ class TipRemoverShader : public StrokeShader {
   real _tipLength;
 };
 
-/*! [ Texture Shader ].
- *  Shader to assign texture to the Stroke material.
+/**
+ * Texture Shader.
+ *
+ * Shader to assign texture to the Stroke material.
  */
-
 class BlenderTextureShader : public StrokeShader {
  private:
   MTex *_mtex;
   bNodeTree *_nodeTree;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param mtex:
    *    The blender texture to use.
    */
-  BlenderTextureShader(MTex *mtex) : StrokeShader()
+  BlenderTextureShader(MTex *mtex)
   {
     _mtex = mtex;
-    _nodeTree = NULL;
+    _nodeTree = nullptr;
   }
 
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param nodetree:
    *    A node tree (of new shading nodes) to define textures.
    */
-  BlenderTextureShader(bNodeTree *nodetree) : StrokeShader()
+  BlenderTextureShader(bNodeTree *nodetree)
   {
     _nodeTree = nodetree;
-    _mtex = NULL;
+    _mtex = nullptr;
   }
 
   virtual string getName() const
@@ -626,24 +602,25 @@ class BlenderTextureShader : public StrokeShader {
     return "BlenderTextureShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
-/*! [ Texture Shader ].
- *  Shader to assign texture to the Stroke material.
+/**
+ * Texture Shader.
+ *
+ * Shader to assign texture to the Stroke material.
  */
-
 class StrokeTextureStepShader : public StrokeShader {
  private:
   float _step;
 
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param id:
    *    The number of the preset to use.
    */
-  StrokeTextureStepShader(float step) : StrokeShader()
+  StrokeTextureStepShader(float step)
   {
     _step = step;
   }
@@ -653,12 +630,10 @@ class StrokeTextureStepShader : public StrokeShader {
     return "StrokeTextureStepShader";
   }
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &stroke) const;
 };
 
 }  // end of namespace StrokeShaders
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_BASIC_STROKE_SHADERS_H__

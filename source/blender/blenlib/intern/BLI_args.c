@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -23,6 +8,7 @@
  */
 
 #include <ctype.h> /* for tolower */
+#include <stdio.h>
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -63,13 +49,19 @@ struct bArgs {
   int argc;
   const char **argv;
   int *passes;
+  /** For printing help text, defaults to `stdout`. */
+  bArgPrintFn print_fn;
+  void *print_user_data;
+
+  /* Only use when initializing arguments. */
+  int current_pass;
 };
 
 static uint case_strhash(const void *ptr)
 {
   const char *s = ptr;
   uint i = 0;
-  unsigned char c;
+  uchar c;
 
   while ((c = tolower(*s++))) {
     i = i * 37 + c;
@@ -92,16 +84,12 @@ static bool keycmp(const void *a, const void *b)
     if (ka->case_str == 1 || kb->case_str == 1) {
       return (BLI_strcasecmp(ka->arg, kb->arg) != 0);
     }
-    else {
-      return (!STREQ(ka->arg, kb->arg));
-    }
+    return !STREQ(ka->arg, kb->arg);
   }
-  else {
-    return BLI_ghashutil_intcmp((const void *)ka->pass, (const void *)kb->pass);
-  }
+  return BLI_ghashutil_intcmp((const void *)ka->pass, (const void *)kb->pass);
 }
 
-static bArgument *lookUp(struct bArgs *ba, const char *arg, int pass, int case_str)
+static bArgument *lookUp(bArgs *ba, const char *arg, int pass, int case_str)
 {
   bAKey key;
 
@@ -112,7 +100,14 @@ static bArgument *lookUp(struct bArgs *ba, const char *arg, int pass, int case_s
   return BLI_ghash_lookup(ba->items, &key);
 }
 
-bArgs *BLI_argsInit(int argc, const char **argv)
+/** Default print function. */
+ATTR_PRINTF_FORMAT(2, 0)
+static void args_print_wrapper(void *UNUSED(user_data), const char *format, va_list args)
+{
+  vprintf(format, args);
+}
+
+bArgs *BLI_args_create(int argc, const char **argv)
 {
   bArgs *ba = MEM_callocN(sizeof(bArgs), "bArgs");
   ba->passes = MEM_callocN(sizeof(int) * argc, "bArgs passes");
@@ -121,10 +116,15 @@ bArgs *BLI_argsInit(int argc, const char **argv)
   ba->argc = argc;
   ba->argv = argv;
 
+  /* Must be initialized by #BLI_args_pass_set. */
+  ba->current_pass = 0;
+
+  BLI_args_print_fn_set(ba, args_print_wrapper, NULL);
+
   return ba;
 }
 
-void BLI_argsFree(struct bArgs *ba)
+void BLI_args_destroy(bArgs *ba)
 {
   BLI_ghash_free(ba->items, MEM_freeN, MEM_freeN);
   MEM_freeN(ba->passes);
@@ -132,7 +132,27 @@ void BLI_argsFree(struct bArgs *ba)
   MEM_freeN(ba);
 }
 
-void BLI_argsPrint(struct bArgs *ba)
+void BLI_args_printf(bArgs *ba, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  ba->print_fn(ba->print_user_data, format, args);
+  va_end(args);
+}
+
+void BLI_args_print_fn_set(bArgs *ba, bArgPrintFn print_fn, void *user_data)
+{
+  ba->print_fn = print_fn;
+  ba->print_user_data = user_data;
+}
+
+void BLI_args_pass_set(bArgs *ba, int current_pass)
+{
+  BLI_assert((current_pass != 0) && (current_pass >= -1));
+  ba->current_pass = current_pass;
+}
+
+void BLI_args_print(const bArgs *ba)
 {
   int i;
   for (i = 0; i < ba->argc; i++) {
@@ -140,12 +160,7 @@ void BLI_argsPrint(struct bArgs *ba)
   }
 }
 
-const char **BLI_argsArgv(struct bArgs *ba)
-{
-  return ba->argv;
-}
-
-static bArgDoc *internalDocs(struct bArgs *ba,
+static bArgDoc *internalDocs(bArgs *ba,
                              const char *short_arg,
                              const char *long_arg,
                              const char *doc)
@@ -167,14 +182,10 @@ static bArgDoc *internalDocs(struct bArgs *ba,
   return d;
 }
 
-static void internalAdd(struct bArgs *ba,
-                        const char *arg,
-                        int pass,
-                        int case_str,
-                        BA_ArgCallback cb,
-                        void *data,
-                        bArgDoc *d)
+static void internalAdd(
+    bArgs *ba, const char *arg, int case_str, BA_ArgCallback cb, void *data, bArgDoc *d)
 {
+  const int pass = ba->current_pass;
   bArgument *a;
   bAKey *key;
 
@@ -207,79 +218,88 @@ static void internalAdd(struct bArgs *ba,
   BLI_ghash_insert(ba->items, key, a);
 }
 
-void BLI_argsAddCase(struct bArgs *ba,
-                     int pass,
-                     const char *short_arg,
-                     int short_case,
-                     const char *long_arg,
-                     int long_case,
-                     const char *doc,
-                     BA_ArgCallback cb,
-                     void *data)
+void BLI_args_add_case(bArgs *ba,
+                       const char *short_arg,
+                       int short_case,
+                       const char *long_arg,
+                       int long_case,
+                       const char *doc,
+                       BA_ArgCallback cb,
+                       void *data)
 {
   bArgDoc *d = internalDocs(ba, short_arg, long_arg, doc);
 
   if (short_arg) {
-    internalAdd(ba, short_arg, pass, short_case, cb, data, d);
+    internalAdd(ba, short_arg, short_case, cb, data, d);
   }
 
   if (long_arg) {
-    internalAdd(ba, long_arg, pass, long_case, cb, data, d);
+    internalAdd(ba, long_arg, long_case, cb, data, d);
   }
 }
 
-void BLI_argsAdd(struct bArgs *ba,
-                 int pass,
-                 const char *short_arg,
-                 const char *long_arg,
-                 const char *doc,
-                 BA_ArgCallback cb,
-                 void *data)
+void BLI_args_add(bArgs *ba,
+                  const char *short_arg,
+                  const char *long_arg,
+                  const char *doc,
+                  BA_ArgCallback cb,
+                  void *data)
 {
-  BLI_argsAddCase(ba, pass, short_arg, 0, long_arg, 0, doc, cb, data);
+  BLI_args_add_case(ba, short_arg, 0, long_arg, 0, doc, cb, data);
 }
 
-static void internalDocPrint(bArgDoc *d)
+static void internalDocPrint(bArgs *ba, bArgDoc *d)
 {
   if (d->short_arg && d->long_arg) {
-    printf("%s or %s", d->short_arg, d->long_arg);
+    BLI_args_printf(ba, "%s or %s", d->short_arg, d->long_arg);
   }
   else if (d->short_arg) {
-    printf("%s", d->short_arg);
+    BLI_args_printf(ba, "%s", d->short_arg);
   }
   else if (d->long_arg) {
-    printf("%s", d->long_arg);
+    BLI_args_printf(ba, "%s", d->long_arg);
   }
 
-  printf(" %s\n\n", d->documentation);
+  BLI_args_printf(ba, " %s\n\n", d->documentation);
 }
 
-void BLI_argsPrintArgDoc(struct bArgs *ba, const char *arg)
+void BLI_args_print_arg_doc(bArgs *ba, const char *arg)
 {
   bArgument *a = lookUp(ba, arg, -1, -1);
 
   if (a) {
     bArgDoc *d = a->doc;
 
-    internalDocPrint(d);
+    internalDocPrint(ba, d);
 
     d->done = true;
   }
 }
 
-void BLI_argsPrintOtherDoc(struct bArgs *ba)
+void BLI_args_print_other_doc(bArgs *ba)
 {
   bArgDoc *d;
 
   for (d = ba->docs.first; d; d = d->next) {
     if (d->done == 0) {
-      internalDocPrint(d);
+      internalDocPrint(ba, d);
     }
   }
 }
 
-void BLI_argsParse(struct bArgs *ba, int pass, BA_ArgCallback default_cb, void *default_data)
+bool BLI_args_has_other_doc(const bArgs *ba)
 {
+  for (const bArgDoc *d = ba->docs.first; d; d = d->next) {
+    if (d->done == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void BLI_args_parse(bArgs *ba, int pass, BA_ArgCallback default_cb, void *default_data)
+{
+  BLI_assert((pass != 0) && (pass >= -1));
   int i = 0;
 
   for (i = 1; i < ba->argc; i++) { /* skip argv[0] */

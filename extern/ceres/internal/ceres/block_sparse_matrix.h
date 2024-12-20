@@ -35,9 +35,12 @@
 #define CERES_INTERNAL_BLOCK_SPARSE_MATRIX_H_
 
 #include <memory>
+
 #include "ceres/block_structure.h"
-#include "ceres/sparse_matrix.h"
+#include "ceres/internal/disable_warnings.h"
 #include "ceres/internal/eigen.h"
+#include "ceres/internal/export.h"
+#include "ceres/sparse_matrix.h"
 
 namespace ceres {
 namespace internal {
@@ -52,7 +55,7 @@ class TripletSparseMatrix;
 //
 //   internal/ceres/block_structure.h
 //
-class BlockSparseMatrix : public SparseMatrix {
+class CERES_NO_EXPORT BlockSparseMatrix final : public SparseMatrix {
  public:
   // Construct a block sparse matrix with a fully initialized
   // CompressedRowBlockStructure objected. The matrix takes over
@@ -66,8 +69,6 @@ class BlockSparseMatrix : public SparseMatrix {
   BlockSparseMatrix(const BlockSparseMatrix&) = delete;
   void operator=(const BlockSparseMatrix&) = delete;
 
-  virtual ~BlockSparseMatrix();
-
   // Implementation of SparseMatrix interface.
   void SetZero() final;
   void RightMultiply(const double* x, double* y) const final;
@@ -77,11 +78,13 @@ class BlockSparseMatrix : public SparseMatrix {
   void ToDenseMatrix(Matrix* dense_matrix) const final;
   void ToTextFile(FILE* file) const final;
 
+  // clang-format off
   int num_rows()         const final { return num_rows_;     }
   int num_cols()         const final { return num_cols_;     }
   int num_nonzeros()     const final { return num_nonzeros_; }
   const double* values() const final { return values_.get(); }
   double* mutable_values()     final { return values_.get(); }
+  // clang-format on
 
   void ToTripletSparseMatrix(TripletSparseMatrix* matrix) const;
   const CompressedRowBlockStructure* block_structure() const;
@@ -93,9 +96,8 @@ class BlockSparseMatrix : public SparseMatrix {
   // Delete the bottom delta_rows_blocks.
   void DeleteRowBlocks(int delta_row_blocks);
 
-  static BlockSparseMatrix* CreateDiagonalMatrix(
-      const double* diagonal,
-      const std::vector<Block>& column_blocks);
+  static std::unique_ptr<BlockSparseMatrix> CreateDiagonalMatrix(
+      const double* diagonal, const std::vector<Block>& column_blocks);
 
   struct RandomMatrixOptions {
     int num_row_blocks = 0;
@@ -119,9 +121,7 @@ class BlockSparseMatrix : public SparseMatrix {
   // Create a random BlockSparseMatrix whose entries are normally
   // distributed and whose structure is determined by
   // RandomMatrixOptions.
-  //
-  // Caller owns the result.
-  static BlockSparseMatrix* CreateRandomMatrix(
+  static std::unique_ptr<BlockSparseMatrix> CreateRandomMatrix(
       const RandomMatrixOptions& options);
 
  private:
@@ -139,9 +139,9 @@ class BlockSparseMatrix : public SparseMatrix {
 //
 // BlockSparseDataMatrix a struct that carries these two bits of
 // information
-class BlockSparseMatrixData {
+class CERES_NO_EXPORT BlockSparseMatrixData {
  public:
-  BlockSparseMatrixData(const BlockSparseMatrix& m)
+  explicit BlockSparseMatrixData(const BlockSparseMatrix& m)
       : block_structure_(m.block_structure()), values_(m.values()){};
 
   BlockSparseMatrixData(const CompressedRowBlockStructure* block_structure,
@@ -160,5 +160,7 @@ class BlockSparseMatrixData {
 
 }  // namespace internal
 }  // namespace ceres
+
+#include "ceres/internal/reenable_warnings.h"
 
 #endif  // CERES_INTERNAL_BLOCK_SPARSE_MATRIX_H_

@@ -30,17 +30,18 @@ but some areas are still being extended and improved.
 Before Starting
 ===============
 
-This document its intended to familiarize you with Blender Python API
+This document is intended to familiarize you with Blender Python API
 but not to fully cover each topic.
 
 A quick list of helpful things to know before starting:
 
-- Blender uses Python 3.x; some online documentation still assumes version 2.x.
-- The interactive console is great for testing one-liners.
-  It also has autocompletion so you can inspect the API quickly.
-- Button tooltips show Python attributes and operator names.
-- The context menu of buttons directly links to this API documentation.
-- More operator examples can be found in the text editor's template menu.
+- Enable :ref:`Developer Extra <blender_manual:bpy.types.PreferencesView.show_developer_ui>`
+  and :ref:`Python Tooltips <blender_manual:bpy.types.PreferencesView.show_tooltips_python>`.
+- The :ref:`Python Console <blender_manual:bpy.types.SpaceConsole>`
+  is great for testing one-liners; it has autocompletion so you can inspect the API quickly.
+- Button tooltips show Python attributes and operator names (when enabled see above).
+- The context menu of buttons directly links to this API documentation (when enabled see above).
+- Many python examples can be found in the text editor's template menu.
 - To examine further scripts distributed with Blender, see:
 
   - ``scripts/startup/bl_ui`` for the user interface.
@@ -59,7 +60,7 @@ Both the *Text Editor* and *Python Console* are space types you can select from 
 Rather than manually configuring your spaces for Python development,
 you can use the *Scripting* workspace accessible from the Topbar tabs.
 
-From the text editor you can open ``.py`` files or paste then from the clipboard, then test using *Run Script*.
+From the text editor you can open ``.py`` files or paste them from the clipboard, then test using *Run Script*.
 The Python Console is typically used for typing in snippets and for testing to get immediate feedback,
 but can also have entire scripts pasted into it.
 Scripts can also run from the command line with Blender but to learn scripting in Blender this isn't essential.
@@ -237,7 +238,7 @@ Examples:
    {'FINISHED'}
    >>> bpy.ops.mesh.hide(unselected=False)
    {'FINISHED'}
-   >>> bpy.ops.object.scale_apply()
+   >>> bpy.ops.object.transform_apply()
    {'FINISHED'}
 
 .. tip::
@@ -287,7 +288,7 @@ In Python, this is done by defining a class, which is a subclass of an existing 
 Example Operator
 ----------------
 
-.. literalinclude:: __/__/__/release/scripts/templates_py/operator_simple.py
+.. literalinclude:: __/__/__/scripts/templates_py/operator_simple.py
 
 Once this script runs, ``SimpleOperator`` is registered with Blender
 and can be called from Operator Search or added to the toolbar.
@@ -319,7 +320,7 @@ Example Panel
 Panels are registered as a class, like an operator.
 Notice the extra ``bl_`` variables used to set the context they display in.
 
-.. literalinclude:: __/__/__/release/scripts/templates_py/ui_panel_simple.py
+.. literalinclude:: __/__/__/scripts/templates_py/ui_panel_simple.py
 
 To run the script:
 

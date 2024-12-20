@@ -1,23 +1,9 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2020-2023 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 """
-./blender.bin --background -noaudio --factory-startup --python tests/python/bl_constraints.py -- --testdir /path/to/lib/tests/constraints
+./blender.bin --background --factory-startup --python tests/python/bl_constraints.py -- --testdir /path/to/tests/data/constraints
 """
 
 import pathlib
@@ -25,6 +11,7 @@ import sys
 import unittest
 
 import bpy
+from bpy.types import Constraint
 from mathutils import Matrix
 
 
@@ -44,7 +31,7 @@ class AbstractConstraintTests(unittest.TestCase):
             collection = top_collection.children[self.layer_collection]
             collection.exclude = False
 
-    def assert_matrix(self, actual_matrix, expect_matrix, object_name: str, places=6, delta=None):
+    def assert_matrix(self, actual_matrix, expect_matrix, object_name: str, places=None, delta=1e-6):
         """Asserts that the matrices almost equal."""
         self.assertEqual(len(actual_matrix), 4, 'Expected a 4x4 matrix')
 
@@ -85,7 +72,7 @@ class AbstractConstraintTests(unittest.TestCase):
         actual = self.bone_matrix(object_name, bone_name)
         self.assert_matrix(actual, expect, object_name)
 
-    def constraint_context(self, constraint_name: str, owner_name: str='') -> dict:
+    def constraint_context(self, constraint_name: str, owner_name: str = '') -> dict:
         """Return a context suitable for calling object constraint operators.
 
         Assumes the owner is called "{constraint_name}.owner" if owner_name=''.
@@ -100,7 +87,7 @@ class AbstractConstraintTests(unittest.TestCase):
         }
         return context
 
-    def bone_constraint_context(self, constraint_name: str, owner_name: str='', bone_name: str='') -> dict:
+    def bone_constraint_context(self, constraint_name: str, owner_name: str = '', bone_name: str = '') -> dict:
         """Return a context suitable for calling bone constraint operators.
 
         Assumes the owner's object is called "{constraint_name}.owner" if owner_name=''.
@@ -138,8 +125,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', Matrix((
             (0.9992385506629944, 0.019844001159071922, -0.03359175845980644, 0.10000011324882507),
             (-0.01744179055094719, 0.997369647026062, 0.07035345584154129, 0.1999998837709427),
@@ -147,7 +135,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
     def test_object_rotation_only(self):
@@ -165,8 +154,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', Matrix((
             (0.9992386102676392, 0.019843975082039833, -0.033591702580451965, 0.10000000149011612),
             (-0.017441781237721443, 0.9973695874214172, 0.0703534483909607, 0.20000000298023224),
@@ -174,7 +164,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
     def test_object_no_x_axis(self):
@@ -193,8 +184,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.object.owner',)
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.object.owner',)
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', Matrix((
             (0.9992386102676392, 0.019843991845846176, -0.03359176218509674, 0.10000000149011612),
             (-0.017441775649785995, 0.997369647026062, 0.0703534483909607, 0.2000001221895218),
@@ -202,7 +194,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
     def test_bone_simple_parent(self):
@@ -215,8 +208,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.armature.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.armature.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.armature.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
 
         self.matrix_test('Child Of.armature.owner', Matrix((
             (0.9992386102676392, 0.019843988120555878, -0.03359176218509674, 0.8358089923858643),
@@ -225,7 +219,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.armature.owner', initial_matrix)
 
     def test_bone_owner(self):
@@ -238,8 +233,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.bone_matrix_test('Child Of.bone.owner', 'Child Of.bone', initial_matrix)
 
-        context = self.bone_constraint_context('Child Of', owner_name='Child Of.bone.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of', owner='BONE')
+        context_override = self.bone_constraint_context('Child Of', owner_name='Child Of.bone.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of', owner='BONE')
 
         self.bone_matrix_test('Child Of.bone.owner', 'Child Of.bone', Matrix((
             (0.9659260511398315, 0.2588191032409668, 4.656613428188905e-10, -2.999999761581421),
@@ -248,7 +244,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of', owner='BONE')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of', owner='BONE')
         self.bone_matrix_test('Child Of.bone.owner', 'Child Of.bone', initial_matrix)
 
     def test_vertexgroup_simple_parent(self):
@@ -261,8 +258,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.vertexgroup.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.vertexgroup.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.vertexgroup.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
 
         self.matrix_test('Child Of.vertexgroup.owner', Matrix((
             (0.9992386102676392, 0.019843988120555878, -0.03359176218509674, 0.10000000149011612),
@@ -271,7 +269,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.vertexgroup.owner', initial_matrix)
 
 
@@ -288,8 +287,9 @@ class ObjectSolverTest(AbstractConstraintTests):
         ))
         self.matrix_test('Object Solver.owner', initial_matrix)
 
-        context = self.constraint_context('Object Solver')
-        bpy.ops.constraint.objectsolver_set_inverse(context, constraint='Object Solver')
+        context_override = self.constraint_context('Object Solver')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.objectsolver_set_inverse(constraint='Object Solver')
         self.matrix_test('Object Solver.owner', Matrix((
             (0.9992387294769287, 0.019843989983201027, -0.03359176591038704, 0.10000025480985641),
             (-0.017441747710108757, 0.9973697662353516, 0.07035345584154129, 0.1999993920326233),
@@ -297,8 +297,168 @@ class ObjectSolverTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.objectsolver_clear_inverse(context, constraint='Object Solver')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.objectsolver_clear_inverse(constraint='Object Solver')
         self.matrix_test('Object Solver.owner', initial_matrix)
+
+
+class CustomSpaceTest(AbstractConstraintTests):
+    layer_collection = 'Custom Space'
+
+    def test_loc_like_object(self):
+        """Custom Space: basic custom space evaluation for objects"""
+        loc_like_constraint = bpy.data.objects["Custom Space.object.owner"].constraints["Copy Location"]
+        loc_like_constraint.use_x = True
+        loc_like_constraint.use_y = True
+        loc_like_constraint.use_z = True
+        self.matrix_test('Custom Space.object.owner', Matrix((
+            (1.0, 0.0, -2.9802322387695312e-08, -0.01753106713294983),
+            (0.0, 1.0, 0.0, -0.08039519190788269),
+            (-2.9802322387695312e-08, 5.960464477539063e-08, 1.0, 0.1584688425064087),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+        loc_like_constraint.use_x = False
+        self.matrix_test('Custom Space.object.owner', Matrix((
+            (1.0, 0.0, -2.9802322387695312e-08, 0.18370598554611206),
+            (0.0, 1.0, 0.0, 0.47120195627212524),
+            (-2.9802322387695312e-08, 5.960464477539063e-08, 1.0, -0.16521614789962769),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+        loc_like_constraint.use_y = False
+        self.matrix_test('Custom Space.object.owner', Matrix((
+            (1.0, 0.0, -2.9802322387695312e-08, -0.46946945786476135),
+            (0.0, 1.0, 0.0, 0.423120379447937),
+            (-2.9802322387695312e-08, 5.960464477539063e-08, 1.0, -0.6532361507415771),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+        loc_like_constraint.use_z = False
+        loc_like_constraint.use_y = True
+        self.matrix_test('Custom Space.object.owner', Matrix((
+            (1.0, 0.0, -2.9802322387695312e-08, -0.346824586391449),
+            (0.0, 1.0, 0.0, 1.0480815172195435),
+            (-2.9802322387695312e-08, 5.960464477539063e-08, 1.0, 0.48802000284194946),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+
+    def test_loc_like_armature(self):
+        """Custom Space: basic custom space evaluation for bones"""
+        loc_like_constraint = bpy.data.objects["Custom Space.armature.owner"].pose.bones["Bone"].constraints["Copy Location"]
+        loc_like_constraint.use_x = True
+        loc_like_constraint.use_y = True
+        loc_like_constraint.use_z = True
+        self.bone_matrix_test('Custom Space.armature.owner', 'Bone', Matrix((
+            (0.4556015729904175, -0.03673229366540909, -0.8894257545471191, -0.01753103733062744),
+            (-0.45956411957740784, -0.8654094934463501, -0.19966775178909302, -0.08039522171020508),
+            (-0.762383222579956, 0.49971696734428406, -0.4111628830432892, 0.1584688425064087),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+        loc_like_constraint.use_x = False
+        self.bone_matrix_test('Custom Space.armature.owner', 'Bone', Matrix((
+            (0.4556015729904175, -0.03673229366540909, -0.8894257545471191, -0.310153603553772),
+            (-0.45956411957740784, -0.8654094934463501, -0.19966775178909302, -0.8824828863143921),
+            (-0.762383222579956, 0.49971696734428406, -0.4111628830432892, 0.629145085811615),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+        loc_like_constraint.use_y = False
+        self.bone_matrix_test('Custom Space.armature.owner', 'Bone', Matrix((
+            (0.4556015729904175, -0.03673229366540909, -0.8894257545471191, -1.0574829578399658),
+            (-0.45956411957740784, -0.8654094934463501, -0.19966775178909302, -0.937495231628418),
+            (-0.762383222579956, 0.49971696734428406, -0.4111628830432892, 0.07077804207801819),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+        loc_like_constraint.use_z = False
+        loc_like_constraint.use_y = True
+        self.bone_matrix_test('Custom Space.armature.owner', 'Bone', Matrix((
+            (0.4556015729904175, -0.03673229366540909, -0.8894257545471191, -0.25267064571380615),
+            (-0.45956411957740784, -0.8654094934463501, -0.19966775178909302, -0.9449876546859741),
+            (-0.762383222579956, 0.49971696734428406, -0.4111628830432892, 0.5583670735359192),
+            (0.0, 0.0, 0.0, 1.0),
+        )))
+
+
+class CopyTransformsTest(AbstractConstraintTests):
+    layer_collection = 'Copy Transforms'
+
+    def test_mix_mode_object(self):
+        """Copy Transforms: all mix modes for objects"""
+        constraint = bpy.data.objects["Copy Transforms.object.owner"].constraints["Copy Transforms"]
+
+        constraint.mix_mode = 'REPLACE'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-0.7818737626075745, 0.14389121532440186, 0.4845699667930603, -0.017531070858240128),
+            (-0.2741589844226837, -0.591389000415802, -1.2397242784500122, -0.08039521425962448),
+            (0.04909384995698929, -1.0109175443649292, 0.7942137122154236, 0.1584688276052475),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+        constraint.mix_mode = 'BEFORE_FULL'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-1.0791258811950684, -0.021011866629123688, 0.3120136260986328, 0.9082338809967041),
+            (0.2128538191318512, -0.3411901891231537, -1.7376484870910645, -0.39762523770332336),
+            (-0.03584420680999756, -1.0162957906723022, 0.8004404306411743, -0.9015425443649292),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+        constraint.mix_mode = 'BEFORE'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-0.9952367544174194, -0.03077685832977295, 0.05301344022154808, 0.9082338809967041),
+            (-0.013416174799203873, -0.39984768629074097, -1.8665285110473633, -0.39762523770332336),
+            (0.03660336509346962, -0.9833710193634033, 0.75728839635849, -0.9015425443649292),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+        constraint.mix_mode = 'BEFORE_SPLIT'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-0.9952367544174194, -0.03077685832977295, 0.05301344022154808, -1.0175310373306274),
+            (-0.013416174799203873, -0.39984768629074097, -1.8665285110473633, 0.9196047782897949),
+            (0.03660336509346962, -0.9833710193634033, 0.75728839635849, 0.1584688276052475),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+        constraint.mix_mode = 'AFTER_FULL'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-0.8939255475997925, -0.2866469621658325, 0.7563635110855103, -0.964445173740387),
+            (-0.09460853785276413, -0.73727947473526, -1.0267245769500732, 0.9622588753700256),
+            (0.37042146921157837, -1.1893107891082764, 1.0113294124603271, 0.21314144134521484),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+        constraint.mix_mode = 'AFTER'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-0.9033845067024231, -0.2048732340335846, 0.7542480826377869, -0.964445173740387),
+            (-0.1757974475622177, -0.6721230745315552, -1.5190268754959106, 0.9622588753700256),
+            (0.38079890608787537, -0.7963172793388367, 1.0880682468414307, 0.21314144134521484),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+        constraint.mix_mode = 'AFTER_SPLIT'
+        self.matrix_test('Copy Transforms.object.owner', Matrix((
+            (-0.9033845067024231, -0.2048732340335846, 0.7542480826377869, -1.0175310373306274),
+            (-0.1757974475622177, -0.6721230745315552, -1.5190268754959106, 0.9196047782897949),
+            (0.38079890608787537, -0.7963172793388367, 1.0880682468414307, 0.1584688276052475),
+            (0.0, 0.0, 0.0, 1.0)
+        )))
+
+
+class ActionConstraintTest(AbstractConstraintTests):
+    layer_collection = "Action"
+
+    def constraint(self) -> Constraint:
+        owner = bpy.context.scene.objects["Action.owner"]
+        constraint = owner.constraints["Action"]
+        return constraint
+
+    def test_assign_action_slot_virgin(self):
+        action = bpy.data.actions.new("Slotted")
+        slot = action.slots.new('OBJECT', "Slot")
+
+        con = self.constraint()
+        con.action = action
+
+        self.assertEqual(
+            slot,
+            con.action_slot,
+            "Assigning an Action with a virgin slot should automatically select that slot")
 
 
 def main():

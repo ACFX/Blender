@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /*
  * This file contains the AbstractHierarchyIterator. It is intended for exporters for file
@@ -33,25 +18,24 @@
  * Selections like "selected only" or "no hair systems" are left to concrete subclasses.
  */
 
-#ifndef __ABSTRACT_HIERARCHY_ITERATOR_H__
-#define __ABSTRACT_HIERARCHY_ITERATOR_H__
+#pragma once
 
 #include "IO_dupli_persistent_id.hh"
+
+#include "DEG_depsgraph.hh"
 
 #include <map>
 #include <set>
 #include <string>
 
-struct Base;
 struct Depsgraph;
 struct DupliObject;
 struct ID;
+struct Main;
 struct Object;
 struct ParticleSystem;
-struct ViewLayer;
 
-namespace blender {
-namespace io {
+namespace blender::io {
 
 class AbstractHierarchyWriter;
 class DupliParentFinder;
@@ -76,19 +60,30 @@ struct HierarchyContext {
    *
    * The export hierarchy is kept as close to the hierarchy in Blender as possible. As such, an
    * object that serves as a parent for another object, but which should NOT be exported itself, is
-   * exported only as transform (i.e. as empty). This happens with objects that are part of a
-   * holdout collection (which prevents them from being exported) but also parent of an exported
-   * object. */
+   * exported only as transform (i.e. as empty). This happens with objects that are invisible when
+   * exporting with "Visible Only" enabled, for example. */
   bool weak_export;
 
   /* When true, this object should check its parents for animation data when determining whether
    * it's animated. This is necessary when a parent object in Blender is not part of the export. */
   bool animation_check_include_parent;
 
+  /* The flag makes unambiguous the fact that the current context targets object or data. This is
+   * notably used in USDHierarchyIterator::create_usd_export_context: options like
+   * merge_parent_xform option is meaningless for object, it only makes sense for data. */
+  bool is_object_data_context;
+
+  /* This flag tells, within a object data context, if an object is the parent of other objects.
+   * This is useful when exporting UsdGeomGprim: those cannot be nested into each other. For
+   * example, an UsdGeomMesh cannot have other UsdGeomMesh as descendants and other hierarchy
+   * strategies need to be adopted.
+   */
+  bool is_parent;
+
   /*********** Determined during writer creation: ***************/
-  float parent_matrix_inv_world[4][4];  // Inverse of the parent's world matrix.
-  std::string export_path;          // Hierarchical path, such as "/grandparent/parent/objectname".
-  ParticleSystem *particle_system;  // Only set for particle/hair writers.
+  float parent_matrix_inv_world[4][4]; /* Inverse of the parent's world matrix. */
+  std::string export_path; /* Hierarchical path, such as "/grandparent/parent/object_name". */
+  ParticleSystem *particle_system; /* Only set for particle/hair writers. */
 
   /* Hierarchical path of the object this object is duplicating; only set when this object should
    * be stored as a reference to its original. It can happen that the original is not part of the
@@ -112,6 +107,8 @@ struct HierarchyContext {
   bool is_instance() const;
   void mark_as_instance_of(const std::string &reference_export_path);
   void mark_as_not_instanced();
+
+  bool is_object_visible(enum eEvaluationMode evaluation_mode) const;
 };
 
 /* Abstract writer for objects. Create concrete subclasses to write to USD, Alembic, etc.
@@ -123,13 +120,20 @@ struct HierarchyContext {
  */
 class AbstractHierarchyWriter {
  public:
-  virtual ~AbstractHierarchyWriter();
+  virtual ~AbstractHierarchyWriter() = default;
   virtual void write(HierarchyContext &context) = 0;
-  // TODO(Sybren): add function like absent() that's called when a writer was previously created,
-  // but wasn't used while exporting the current frame (for example, a particle-instanced mesh of
-  // which the particle is no longer alive).
+  /* TODO(Sybren): add function like absent() that's called when a writer was previously created,
+   * but wasn't used while exporting the current frame (for example, a particle-instanced mesh of
+   * which the particle is no longer alive). */
  protected:
+  /* Return true if the data written by this writer changes over time.
+   * Note that this function assumes this is an object data writer. Transform writers should not
+   * call this but implement their own logic. */
   virtual bool check_is_animated(const HierarchyContext &context) const;
+
+  /* Helper functions for animation checks. */
+  static bool check_has_physics(const HierarchyContext &context);
+  static bool check_has_deforming_physics(const HierarchyContext &context);
 };
 
 /* Determines which subset of the writers actually gets to write. */
@@ -179,9 +183,6 @@ class ObjectIdentifier {
   ObjectIdentifier(Object *object, Object *duplicated_by, const PersistentID &persistent_id);
 
  public:
-  ObjectIdentifier(const ObjectIdentifier &other);
-  ~ObjectIdentifier();
-
   static ObjectIdentifier for_graph_root();
   static ObjectIdentifier for_real_object(Object *object);
   static ObjectIdentifier for_hierarchy_context(const HierarchyContext *context);
@@ -216,12 +217,13 @@ class AbstractHierarchyIterator {
  protected:
   ExportGraph export_graph_;
   ExportPathMap duplisource_export_path_;
+  Main *bmain_;
   Depsgraph *depsgraph_;
   WriterMap writers_;
   ExportSubset export_subset_;
 
  public:
-  explicit AbstractHierarchyIterator(Depsgraph *depsgraph);
+  explicit AbstractHierarchyIterator(Main *bmain, Depsgraph *depsgraph);
   virtual ~AbstractHierarchyIterator();
 
   /* Iterate over the depsgraph, create writers, and tell the writers to write.
@@ -239,7 +241,7 @@ class AbstractHierarchyIterator {
    * writer is created it will also write the current iteration, to ensure the hierarchy is
    * complete. The `export_subset` option is only in effect when the writer already existed from a
    * previous iteration. */
-  void set_export_subset(ExportSubset export_subset_);
+  void set_export_subset(ExportSubset export_subset);
 
   /* Convert the given name to something that is valid for the exported file format.
    * This base implementation is a no-op; override in a concrete subclass. */
@@ -273,12 +275,12 @@ class AbstractHierarchyIterator {
 
   void determine_export_paths(const HierarchyContext *parent_context);
   void determine_duplication_references(const HierarchyContext *parent_context,
-                                        std::string indent);
+                                        const std::string &indent);
 
   /* These three functions create writers and call their write() method. */
   void make_writers(const HierarchyContext *parent_context);
   void make_writer_object_data(const HierarchyContext *context);
-  void make_writers_particle_systems(const HierarchyContext *context);
+  void make_writers_particle_systems(const HierarchyContext *transform_context);
 
   /* Return the appropriate HierarchyContext for the data of the object represented by
    * object_context. */
@@ -340,13 +342,10 @@ class AbstractHierarchyIterator {
   virtual AbstractHierarchyWriter *create_particle_writer(const HierarchyContext *context) = 0;
 
   /* Called by release_writers() to free what the create_XXX_writer() functions allocated. */
-  virtual void delete_object_writer(AbstractHierarchyWriter *writer) = 0;
+  virtual void release_writer(AbstractHierarchyWriter *writer) = 0;
 
   AbstractHierarchyWriter *get_writer(const std::string &export_path) const;
-  ExportChildren &graph_children(const HierarchyContext *parent_context);
+  ExportChildren &graph_children(const HierarchyContext *context);
 };
 
-}  // namespace io
-}  // namespace blender
-
-#endif /* __ABSTRACT_HIERARCHY_ITERATOR_H__ */
+}  // namespace blender::io

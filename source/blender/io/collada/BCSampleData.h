@@ -1,24 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __BCSAMPLEDATA_H__
-#define __BCSAMPLEDATA_H__
+#pragma once
 
 #include <algorithm>
 #include <map>
@@ -28,7 +12,7 @@
 #include "BCSampleData.h"
 #include "ExportSettings.h"
 
-#include "BKE_object.h"
+#include "BKE_object.hh"
 
 #include "BLI_math_rotation.h"
 
@@ -46,21 +30,18 @@ class BCSample {
   BCBoneMatrixMap bonemats; /* For Armature animation */
 
  public:
-  BCSample(Object *ob) : obmat(ob)
-  {
-  }
+  BCSample(Object *ob) : obmat(ob) {}
 
   ~BCSample();
 
   void add_bone_matrix(Bone *bone, Matrix &mat);
 
-  const bool get_value(std::string channel_target, const int array_index, float *val) const;
+  /** Get channel value. */
+  bool get_value(std::string channel_target, int array_index, float *val) const;
   const BCMatrix &get_matrix() const;
-  const BCMatrix *get_matrix(Bone *bone) const;  // returns NULL if bone is not animated
+  const BCMatrix *get_matrix(Bone *bone) const; /* returns NULL if bone is not animated */
 };
 
 typedef std::map<Object *, BCSample *> BCSampleMap;
 typedef std::map<int, const BCSample *> BCFrameSampleMap;
 typedef std::map<int, const BCMatrix *> BCMatrixSampleMap;
-
-#endif /* __BCSAMPLEDATA_H__ */

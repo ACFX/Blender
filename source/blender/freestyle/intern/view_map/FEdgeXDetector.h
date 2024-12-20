@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_FEDGE_X_DETECTOR_H__
-#define __FREESTYLE_FEDGE_X_DETECTOR_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -33,23 +20,19 @@
 #include "../winged_edge/Curvature.h"
 #include "../winged_edge/WXEdge.h"
 
-#include "BLI_math.h"
-
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
 using namespace Geometry;
 
-/*! This class takes as input a WXEdge structure and fills it */
+/** This class takes as input a WXEdge structure and fills it */
 class FEdgeXDetector {
  public:
   FEdgeXDetector()
   {
-    _pProgressBar = NULL;
-    _pRenderMonitor = NULL;
+    _pProgressBar = nullptr;
+    _pRenderMonitor = nullptr;
     _computeViewIndependent = true;
 #if 0
     _bbox_diagonal = 1.0;
@@ -66,28 +49,26 @@ class FEdgeXDetector {
     _creaseAngle = 0.7;  // angle of 134.43 degrees
   }
 
-  virtual ~FEdgeXDetector()
-  {
-  }
+  virtual ~FEdgeXDetector() {}
 
-  /*! Process shapes from a WingedEdge containing a list of WShapes */
+  /** Process shapes from a WingedEdge containing a list of WShapes */
   virtual void processShapes(WingedEdge &);
 
   // GENERAL STUFF
-  virtual void preProcessShape(WXShape *iShape);
+  virtual void preProcessShape(WXShape *iWShape);
   virtual void preProcessFace(WXFace *iFace);
   virtual void computeCurvatures(WXVertex *iVertex);
 
   // SILHOUETTE
-  virtual void processSilhouetteShape(WXShape *iShape);
+  virtual void processSilhouetteShape(WXShape *iWShape);
   virtual void ProcessSilhouetteFace(WXFace *iFace);
   virtual void ProcessSilhouetteEdge(WXEdge *iEdge);
 
   // CREASE
-  virtual void processCreaseShape(WXShape *iShape);
+  virtual void processCreaseShape(WXShape *iWShape);
   virtual void ProcessCreaseEdge(WXEdge *iEdge);
 
-  /*! Sets the minimum angle for detecting crease edges
+  /** Sets the minimum angle for detecting crease edges
    *  \param angle:
    *    The angular threshold in degrees (between 0 and 180) for detecting crease edges. An edge is
    * considered a crease edge if the angle between two faces sharing the edge is smaller than the
@@ -110,19 +91,19 @@ class FEdgeXDetector {
   }
 
   // BORDER
-  virtual void processBorderShape(WXShape *iShape);
+  virtual void processBorderShape(WXShape *iWShape);
   virtual void ProcessBorderEdge(WXEdge *iEdge);
 
   // RIDGES AND VALLEYS
-  virtual void processRidgesAndValleysShape(WXShape *iShape);
+  virtual void processRidgesAndValleysShape(WXShape *iWShape);
   virtual void ProcessRidgeFace(WXFace *iFace);
 
   // SUGGESTIVE CONTOURS
-  virtual void processSuggestiveContourShape(WXShape *iShape);
+  virtual void processSuggestiveContourShape(WXShape *iWShape);
   virtual void ProcessSuggestiveContourFace(WXFace *iFace);
   virtual void postProcessSuggestiveContourShape(WXShape *iShape);
   virtual void postProcessSuggestiveContourFace(WXFace *iFace);
-  /*! Sets the minimal derivative of the radial curvature for suggestive contours
+  /** Sets the minimal derivative of the radial curvature for suggestive contours
    *  \param dkr:
    *    The minimal derivative of the radial curvature
    */
@@ -145,7 +126,7 @@ class FEdgeXDetector {
   // EVERYBODY
   virtual void buildSmoothEdges(WXShape *iShape);
 
-  /*! Sets the current viewpoint */
+  /** Sets the current viewpoint */
   inline void setViewpoint(const Vec3f &ivp)
   {
     _Viewpoint = ivp;
@@ -187,7 +168,7 @@ class FEdgeXDetector {
     }
   }
 
-  /*! Sets the radius of the geodesic sphere around each vertex (for the curvature computation)
+  /** Sets the radius of the geodesic sphere around each vertex (for the curvature computation)
    *  \param r:
    *    The radius of the sphere expressed as a ratio of the mean edge size
    */
@@ -222,7 +203,7 @@ class FEdgeXDetector {
   real _minKr;
   real _maxK1;
   real _maxKr;
-  unsigned _nPoints;
+  uint _nPoints;
   real _meanEdgeSize;
   bool _orthographicProjection;
 
@@ -240,11 +221,7 @@ class FEdgeXDetector {
   ProgressBar *_pProgressBar;
   RenderMonitor *_pRenderMonitor;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:FEdgeXDetector")
-#endif
 };
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_FEDGE_X_DETECTOR_H__

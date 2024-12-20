@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -23,15 +8,14 @@
 
 #pragma once
 
-#include "intern/node/deg_node.h"
-#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_operation.hh"
 
 struct ID;
 struct PointerRNA;
 struct PropertyRNA;
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 struct Depsgraph;
 struct Node;
@@ -93,7 +77,21 @@ class RNANodeQuery {
 
   /* Make sure ID data exists for the given ID, and returns it. */
   RNANodeQueryIDData *ensure_id_data(const ID *id);
+
+  /* Check whether prop_identifier contains rna_path_component.
+   *
+   * This checks more than a sub-string:
+   *
+   * prop_identifier           contains(prop_identifier, "location")
+   * ------------------------  -------------------------------------
+   * location                  true
+   * ["test_location"]         false
+   * pose["bone"].location     true
+   * pose["bone"].location.x   true
+   */
+  static bool contains(const char *prop_identifier, const char *rna_path_component);
 };
 
-}  // namespace deg
-}  // namespace blender
+bool rna_prop_affects_parameters_node(const PointerRNA *ptr, const PropertyRNA *prop);
+
+}  // namespace blender::deg

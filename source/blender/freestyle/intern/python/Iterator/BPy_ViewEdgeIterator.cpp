@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -27,41 +15,41 @@
 extern "C" {
 #endif
 
+using namespace Freestyle;
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-PyDoc_STRVAR(ViewEdgeIterator_doc,
-             "Class hierarchy: :class:`Iterator` > :class:`ViewEdgeIterator`\n"
-             "\n"
-             "Base class for iterators over ViewEdges of the :class:`ViewMap` Graph.\n"
-             "Basically the increment() operator of this class should be able to\n"
-             "take the decision of \"where\" (on which ViewEdge) to go when pointing\n"
-             "on a given ViewEdge.\n"
-             "\n"
-             ".. method:: __init__(begin=None, orientation=True)\n"
-             "\n"
-             "   Builds a ViewEdgeIterator from a starting ViewEdge and its\n"
-             "   orientation.\n"
-             "\n"
-             "   :arg begin: The ViewEdge from where to start the iteration.\n"
-             "   :type begin: :class:`ViewEdge` or None\n"
-             "   :arg orientation: If true, we'll look for the next ViewEdge among\n"
-             "      the ViewEdges that surround the ending ViewVertex of begin.  If\n"
-             "      false, we'll search over the ViewEdges surrounding the ending\n"
-             "      ViewVertex of begin.\n"
-             "   :type orientation: bool\n"
-             "\n"
-             ".. method:: __init__(brother)\n"
-             "\n"
-             "   Copy constructor.\n"
-             "\n"
-             "   :arg brother: A ViewEdgeIterator object.\n"
-             "   :type brother: :class:`ViewEdgeIterator`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewEdgeIterator_doc,
+    "Class hierarchy: :class:`Iterator` > :class:`ViewEdgeIterator`\n"
+    "\n"
+    "Base class for iterators over ViewEdges of the :class:`ViewMap` Graph.\n"
+    "Basically the increment() operator of this class should be able to\n"
+    "take the decision of \"where\" (on which ViewEdge) to go when pointing\n"
+    "on a given ViewEdge.\n"
+    "\n"
+    ".. method:: __init__(begin=None, orientation=True)\n"
+    "            __init__(brother)\n"
+    "\n"
+    "   Builds a ViewEdgeIterator from a starting ViewEdge and its\n"
+    "   orientation or the copy constructor.\n"
+    "\n"
+    "   :arg begin: The ViewEdge from where to start the iteration.\n"
+    "   :type begin: :class:`ViewEdge` | None\n"
+    "   :arg orientation: If true, we'll look for the next ViewEdge among\n"
+    "      the ViewEdges that surround the ending ViewVertex of begin. If\n"
+    "      false, we'll search over the ViewEdges surrounding the ending\n"
+    "      ViewVertex of begin.\n"
+    "   :type orientation: bool\n"
+    "   :arg brother: A ViewEdgeIterator object.\n"
+    "   :type brother: :class:`ViewEdgeIterator`");
 
 static int check_begin(PyObject *obj, void *v)
 {
-  if (obj != NULL && obj != Py_None && !BPy_ViewEdge_Check(obj)) {
+  if (obj != nullptr && obj != Py_None && !BPy_ViewEdge_Check(obj)) {
     return 0;
   }
   *((PyObject **)v) = obj;
@@ -70,19 +58,21 @@ static int check_begin(PyObject *obj, void *v)
 
 static int ViewEdgeIterator_init(BPy_ViewEdgeIterator *self, PyObject *args, PyObject *kwds)
 {
-  static const char *kwlist_1[] = {"brother", NULL};
-  static const char *kwlist_2[] = {"begin", "orientation", NULL};
-  PyObject *obj1 = 0, *obj2 = 0;
+  static const char *kwlist_1[] = {"brother", nullptr};
+  static const char *kwlist_2[] = {"begin", "orientation", nullptr};
+  PyObject *obj1 = nullptr, *obj2 = nullptr;
 
   if (PyArg_ParseTupleAndKeywords(
-          args, kwds, "O!", (char **)kwlist_1, &ViewEdgeIterator_Type, &obj1)) {
+          args, kwds, "O!", (char **)kwlist_1, &ViewEdgeIterator_Type, &obj1))
+  {
     self->ve_it = new ViewEdgeInternal::ViewEdgeIterator(*(((BPy_ViewEdgeIterator *)obj1)->ve_it));
   }
-  else if (PyErr_Clear(),
-           (obj1 = obj2 = 0),
+  else if ((void)PyErr_Clear(),
+           (void)(obj1 = obj2 = nullptr),
            PyArg_ParseTupleAndKeywords(
-               args, kwds, "|O&O!", (char **)kwlist_2, check_begin, &obj1, &PyBool_Type, &obj2)) {
-    ViewEdge *begin = (!obj1 || obj1 == Py_None) ? NULL : ((BPy_ViewEdge *)obj1)->ve;
+               args, kwds, "|O&O!", (char **)kwlist_2, check_begin, &obj1, &PyBool_Type, &obj2))
+  {
+    ViewEdge *begin = (!obj1 || obj1 == Py_None) ? nullptr : ((BPy_ViewEdge *)obj1)->ve;
     bool orientation = (!obj2) ? true : bool_from_PyBool(obj2);
     self->ve_it = new ViewEdgeInternal::ViewEdgeIterator(begin, orientation);
   }
@@ -94,10 +84,12 @@ static int ViewEdgeIterator_init(BPy_ViewEdgeIterator *self, PyObject *args, PyO
   return 0;
 }
 
-PyDoc_STRVAR(ViewEdgeIterator_change_orientation_doc,
-             ".. method:: change_orientation()\n"
-             "\n"
-             "   Changes the current orientation.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewEdgeIterator_change_orientation_doc,
+    ".. method:: change_orientation()\n"
+    "\n"
+    "   Changes the current orientation.");
 
 static PyObject *ViewEdgeIterator_change_orientation(BPy_ViewEdgeIterator *self)
 {
@@ -110,21 +102,23 @@ static PyMethodDef BPy_ViewEdgeIterator_methods[] = {
      (PyCFunction)ViewEdgeIterator_change_orientation,
      METH_NOARGS,
      ViewEdgeIterator_change_orientation_doc},
-    {NULL, NULL, 0, NULL},
+    {nullptr, nullptr, 0, nullptr},
 };
 
 /*----------------------ViewEdgeIterator get/setters ----------------------------*/
 
-PyDoc_STRVAR(ViewEdgeIterator_object_doc,
-             "The ViewEdge object currently pointed by this iterator.\n"
-             "\n"
-             ":type: :class:`ViewEdge`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewEdgeIterator_object_doc,
+    "The ViewEdge object currently pointed by this iterator.\n"
+    "\n"
+    ":type: :class:`ViewEdge`");
 
-static PyObject *ViewEdgeIterator_object_get(BPy_ViewEdgeIterator *self, void *UNUSED(closure))
+static PyObject *ViewEdgeIterator_object_get(BPy_ViewEdgeIterator *self, void * /*closure*/)
 {
   if (!self->ve_it->isEnd()) {
     PyErr_SetString(PyExc_RuntimeError, "iteration has stopped");
-    return NULL;
+    return nullptr;
   }
   ViewEdge *ve = self->ve_it->operator*();
   if (ve) {
@@ -133,13 +127,14 @@ static PyObject *ViewEdgeIterator_object_get(BPy_ViewEdgeIterator *self, void *U
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(ViewEdgeIterator_current_edge_doc,
-             "The ViewEdge object currently pointed by this iterator.\n"
-             "\n"
-             ":type: :class:`ViewEdge`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewEdgeIterator_current_edge_doc,
+    "The ViewEdge object currently pointed by this iterator.\n"
+    "\n"
+    ":type: :class:`ViewEdge`");
 
-static PyObject *ViewEdgeIterator_current_edge_get(BPy_ViewEdgeIterator *self,
-                                                   void *UNUSED(closure))
+static PyObject *ViewEdgeIterator_current_edge_get(BPy_ViewEdgeIterator *self, void * /*closure*/)
 {
   ViewEdge *ve = self->ve_it->getCurrentEdge();
   if (ve) {
@@ -150,7 +145,7 @@ static PyObject *ViewEdgeIterator_current_edge_get(BPy_ViewEdgeIterator *self,
 
 static int ViewEdgeIterator_current_edge_set(BPy_ViewEdgeIterator *self,
                                              PyObject *value,
-                                             void *UNUSED(closure))
+                                             void * /*closure*/)
 {
   if (!BPy_ViewEdge_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be a ViewEdge");
@@ -160,24 +155,25 @@ static int ViewEdgeIterator_current_edge_set(BPy_ViewEdgeIterator *self,
   return 0;
 }
 
-PyDoc_STRVAR(ViewEdgeIterator_orientation_doc,
-             "The orientation of the pointed ViewEdge in the iteration.\n"
-             "If true, the iterator looks for the next ViewEdge among those ViewEdges\n"
-             "that surround the ending ViewVertex of the \"begin\" ViewEdge.  If false,\n"
-             "the iterator searches over the ViewEdges surrounding the ending ViewVertex\n"
-             "of the \"begin\" ViewEdge.\n"
-             "\n"
-             ":type: bool");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewEdgeIterator_orientation_doc,
+    "The orientation of the pointed ViewEdge in the iteration.\n"
+    "If true, the iterator looks for the next ViewEdge among those ViewEdges\n"
+    "that surround the ending ViewVertex of the \"begin\" ViewEdge. If false,\n"
+    "the iterator searches over the ViewEdges surrounding the ending ViewVertex\n"
+    "of the \"begin\" ViewEdge.\n"
+    "\n"
+    ":type: bool");
 
-static PyObject *ViewEdgeIterator_orientation_get(BPy_ViewEdgeIterator *self,
-                                                  void *UNUSED(closure))
+static PyObject *ViewEdgeIterator_orientation_get(BPy_ViewEdgeIterator *self, void * /*closure*/)
 {
   return PyBool_from_bool(self->ve_it->getOrientation());
 }
 
 static int ViewEdgeIterator_orientation_set(BPy_ViewEdgeIterator *self,
                                             PyObject *value,
-                                            void *UNUSED(closure))
+                                            void * /*closure*/)
 {
   if (!PyBool_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be a boolean");
@@ -187,12 +183,14 @@ static int ViewEdgeIterator_orientation_set(BPy_ViewEdgeIterator *self,
   return 0;
 }
 
-PyDoc_STRVAR(ViewEdgeIterator_begin_doc,
-             "The first ViewEdge used for the iteration.\n"
-             "\n"
-             ":type: :class:`ViewEdge`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewEdgeIterator_begin_doc,
+    "The first ViewEdge used for the iteration.\n"
+    "\n"
+    ":type: :class:`ViewEdge`");
 
-static PyObject *ViewEdgeIterator_begin_get(BPy_ViewEdgeIterator *self, void *UNUSED(closure))
+static PyObject *ViewEdgeIterator_begin_get(BPy_ViewEdgeIterator *self, void * /*closure*/)
 {
   ViewEdge *ve = self->ve_it->getBegin();
   if (ve) {
@@ -203,7 +201,7 @@ static PyObject *ViewEdgeIterator_begin_get(BPy_ViewEdgeIterator *self, void *UN
 
 static int ViewEdgeIterator_begin_set(BPy_ViewEdgeIterator *self,
                                       PyObject *value,
-                                      void *UNUSED(closure))
+                                      void * /*closure*/)
 {
   if (!BPy_ViewEdge_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be a ViewEdge");
@@ -216,67 +214,68 @@ static int ViewEdgeIterator_begin_set(BPy_ViewEdgeIterator *self,
 static PyGetSetDef BPy_ViewEdgeIterator_getseters[] = {
     {"object",
      (getter)ViewEdgeIterator_object_get,
-     (setter)NULL,
+     (setter) nullptr,
      ViewEdgeIterator_object_doc,
-     NULL},
+     nullptr},
     {"current_edge",
      (getter)ViewEdgeIterator_current_edge_get,
      (setter)ViewEdgeIterator_current_edge_set,
      ViewEdgeIterator_current_edge_doc,
-     NULL},
+     nullptr},
     {"orientation",
      (getter)ViewEdgeIterator_orientation_get,
      (setter)ViewEdgeIterator_orientation_set,
      ViewEdgeIterator_orientation_doc,
-     NULL},
+     nullptr},
     {"begin",
      (getter)ViewEdgeIterator_begin_get,
      (setter)ViewEdgeIterator_begin_set,
      ViewEdgeIterator_begin_doc,
-     NULL},
-    {NULL, NULL, NULL, NULL, NULL} /* Sentinel */
+     nullptr},
+    {nullptr, nullptr, nullptr, nullptr, nullptr} /* Sentinel */
 };
 
 /*-----------------------BPy_ViewEdgeIterator type definition ------------------------------*/
 
 PyTypeObject ViewEdgeIterator_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0) "ViewEdgeIterator", /* tp_name */
-    sizeof(BPy_ViewEdgeIterator),                      /* tp_basicsize */
-    0,                                                 /* tp_itemsize */
-    0,                                                 /* tp_dealloc */
-    0,                                                 /* tp_print */
-    0,                                                 /* tp_getattr */
-    0,                                                 /* tp_setattr */
-    0,                                                 /* tp_reserved */
-    0,                                                 /* tp_repr */
-    0,                                                 /* tp_as_number */
-    0,                                                 /* tp_as_sequence */
-    0,                                                 /* tp_as_mapping */
-    0,                                                 /* tp_hash  */
-    0,                                                 /* tp_call */
-    0,                                                 /* tp_str */
-    0,                                                 /* tp_getattro */
-    0,                                                 /* tp_setattro */
-    0,                                                 /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,          /* tp_flags */
-    ViewEdgeIterator_doc,                              /* tp_doc */
-    0,                                                 /* tp_traverse */
-    0,                                                 /* tp_clear */
-    0,                                                 /* tp_richcompare */
-    0,                                                 /* tp_weaklistoffset */
-    0,                                                 /* tp_iter */
-    0,                                                 /* tp_iternext */
-    BPy_ViewEdgeIterator_methods,                      /* tp_methods */
-    0,                                                 /* tp_members */
-    BPy_ViewEdgeIterator_getseters,                    /* tp_getset */
-    &Iterator_Type,                                    /* tp_base */
-    0,                                                 /* tp_dict */
-    0,                                                 /* tp_descr_get */
-    0,                                                 /* tp_descr_set */
-    0,                                                 /* tp_dictoffset */
-    (initproc)ViewEdgeIterator_init,                   /* tp_init */
-    0,                                                 /* tp_alloc */
-    0,                                                 /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "ViewEdgeIterator",
+    /*tp_basicsize*/ sizeof(BPy_ViewEdgeIterator),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ ViewEdgeIterator_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ BPy_ViewEdgeIterator_methods,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ BPy_ViewEdgeIterator_getseters,
+    /*tp_base*/ &Iterator_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)ViewEdgeIterator_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////

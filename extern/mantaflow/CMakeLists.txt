@@ -1,27 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2016 Blender Foundation
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2016, Blender Foundation
-# All rights reserved.
-#
-# The Original Code is: all of this file.
-#
-# Contributor(s): Sebastian Barschkis (sebbas)
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Mantaflow triggers a clang-cl compiler error with versions before 9.0.1
 # Since mantaflow does not appear to be using OpenMP at this point in time,
@@ -31,19 +10,33 @@ if(MSVC_CLANG AND WITH_OPENMP AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0.1
   remove_cc_flag("-fopenmp")
 endif()
 
-set(MANTAVERSION "0.12")
+set(MANTAVERSION "0.13")
 
 add_definitions(-DWITH_FLUID=1)
 
-set(MANTA_DEP
-  dependencies
-)
+# Compile Mantaflow dependencies too (e.g. `cnpy` for NUMPY file IO).
+# Make sure that dependencies exist before enabling this option
+# by updating the source files in `extern/`.
+set(WITH_MANTA_DEPENDENCIES 0)
+
+# Enable Mantaflow NUMPY support.
+set(WITH_MANTA_NUMPY 0)
+
+if(NOT WITH_MANTA_DEPENDENCIES)
+  add_definitions(-DNO_CNPY=1)
+endif()
+
 set(MANTA_HLP
   helper
 )
 set(MANTA_PP
   preprocessed
 )
+if(WITH_MANTA_DEPENDENCIES)
+  set(MANTA_DEP
+    dependencies
+  )
+endif()
 
 if(WITH_TBB)
   add_definitions(-DTBB=1)
@@ -51,7 +44,8 @@ endif()
 
 if(WITH_OPENVDB)
   add_definitions(-DOPENVDB=1)
-  add_definitions(-DOPENVDB_STATICLIB)
+  # OpenVDB headers use deprecated TBB headers, silence warning.
+  add_definitions(-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
 endif()
 
 if(WITH_OPENVDB_BLOSC)
@@ -62,6 +56,10 @@ if(WIN32)
   add_definitions(-D_USE_MATH_DEFINES)
 endif()
 
+if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
+  add_definitions(-DNUMPY=1)
+endif()
+
 set(INC
   ${MANTA_PP}
   ${MANTA_PP}/fileio
@@ -69,20 +67,22 @@ set(INC
   ${MANTA_PP}/plugin
   ${MANTA_HLP}/pwrapper
   ${MANTA_HLP}/util
-  ${MANTA_DEP}/cnpy
 )
+
+if(WITH_MANTA_DEPENDENCIES)
+  list(APPEND INC
+    ${MANTA_DEP}/cnpy
+  )
+endif()
 
 set(INC_SYS
   ${PYTHON_INCLUDE_DIRS}
   ${ZLIB_INCLUDE_DIRS}
 )
 
-if(WITH_TBB)
+if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
   list(APPEND INC_SYS
-    ${TBB_INCLUDE_DIRS}
-  )
-  list(APPEND LIB
-    ${TBB_LIBRARIES}
+    ${PYTHON_NUMPY_INCLUDE_DIRS}
   )
 endif()
 
@@ -93,12 +93,22 @@ if(WITH_OPENVDB)
   list(APPEND LIB
     ${OPENVDB_LIBRARIES}
   )
+  if(WIN32)
+    # OpenVDB emits lots of these, they should be suppressed through other
+    # means but MSVC 16.8/16.9 has broken this functionality, so C4251 is
+    # suppressed here explicitly. See
+    # https://developercommunity.visualstudio.com/content/problem/1167590/bug.html
+    # for details.
+    string(APPEND CMAKE_CXX_FLAGS " /wd4251")
+  endif()
+
+  # This works around the issue described in #120317 and https://github.com/AcademySoftwareFoundation/openvdb/pull/1786
+  if(MSVC_CLANG)
+    set_source_files_properties(${MANTA_PP}/fileio/iovdb.cpp PROPERTIES COMPILE_FLAGS -fno-delayed-template-parsing)
+  endif()
 endif()
 
 set(SRC
-  ${MANTA_DEP}/cnpy/cnpy.cpp
-  ${MANTA_DEP}/cnpy/cnpy.h
-
   ${MANTA_PP}/commonkernels.h
   ${MANTA_PP}/commonkernels.h.reg.cpp
   ${MANTA_PP}/conjugategrad.cpp
@@ -161,14 +171,11 @@ set(SRC
   ${MANTA_PP}/plugin/initplugins.cpp
   ${MANTA_PP}/plugin/kepsilon.cpp
   ${MANTA_PP}/plugin/meshplugins.cpp
-# TODO (sebbas): add numpy to libraries
-#   ${MANTA_PP}/plugin/numpyconvert.cpp
   ${MANTA_PP}/plugin/pressure.cpp
   ${MANTA_PP}/plugin/ptsplugins.cpp
   ${MANTA_PP}/plugin/secondaryparticles.cpp
   ${MANTA_PP}/plugin/surfaceturbulence.cpp
-# TODO (sebbas): add numpy to libraries
-#   ${MANTA_PP}/plugin/tfplugins.cpp
+  ${MANTA_PP}/plugin/viscosity.cpp
   ${MANTA_PP}/plugin/vortexplugins.cpp
   ${MANTA_PP}/plugin/waveletturbulence.cpp
   ${MANTA_PP}/plugin/waves.cpp
@@ -193,9 +200,6 @@ set(SRC
   ${MANTA_PP}/vortexsheet.h.reg.cpp
 
   ${MANTA_HLP}/pwrapper/manta.h
-# TODO (sebbas): add numpy to libraries
-#  ${MANTA_HLP}/pwrapper/numpyWrap.cpp
-#  ${MANTA_HLP}/pwrapper/numpyWrap.h
   ${MANTA_HLP}/pwrapper/pclass.cpp
   ${MANTA_HLP}/pwrapper/pclass.h
   ${MANTA_HLP}/pwrapper/pconvert.cpp
@@ -221,9 +225,34 @@ set(SRC
   ${MANTA_HLP}/util/vectorbase.h
 )
 
+if(WITH_MANTA_DEPENDENCIES)
+  list(APPEND SRC
+    ${MANTA_DEP}/cnpy/cnpy.cpp
+    ${MANTA_DEP}/cnpy/cnpy.h
+  )
+endif()
+if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
+  list(APPEND SRC
+    ${MANTA_PP}/plugin/numpyconvert.cpp
+    ${MANTA_PP}/plugin/tfplugins.cpp
+    ${MANTA_HLP}/pwrapper/numpyWrap.cpp
+    ${MANTA_HLP}/pwrapper/numpyWrap.h
+  )
+endif()
+
 set(LIB
+  PRIVATE bf::dependencies::optional::tbb
   ${PYTHON_LINKFLAGS}
   ${PYTHON_LIBRARIES}
 )
 
 blender_add_lib(extern_mantaflow "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(WITH_OPENVDB)
+  # The VDB libs above are only added to as INTERFACE libs by blender_add_lib,
+  # meaning extern_mantaflow itself actually does not have a dependency on the
+  # OpenVDB libraries, and CMAKE is free to link the VDB libraries before
+  # extern_mantaflow causing linker errors on linux. By explicitly declaring
+  # a dependency here, CMAKE will do the right thing.
+  target_link_libraries(extern_mantaflow PRIVATE ${OPENVDB_LIBRARIES})
+endif()

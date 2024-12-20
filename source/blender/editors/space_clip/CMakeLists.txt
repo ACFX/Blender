@@ -1,77 +1,60 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2011 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2011 Blender Foundation.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenfont
   ../../blenkernel
-  ../../blenlib
+  ../../blenloader
   ../../blentranslation
-  ../../depsgraph
   ../../gpu
   ../../imbuf
-  ../../makesdna
+  ../../imbuf/movie
   ../../makesrna
   ../../windowmanager
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
-  ${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
-  clip_buttons.c
-  clip_dopesheet_draw.c
-  clip_dopesheet_ops.c
-  clip_draw.c
-  clip_editor.c
-  clip_graph_draw.c
-  clip_graph_ops.c
-  clip_ops.c
-  clip_toolbar.c
-  clip_utils.c
-  space_clip.c
-  tracking_ops.c
-  tracking_ops_detect.c
-  tracking_ops_orient.c
-  tracking_ops_plane.c
-  tracking_ops_solve.c
-  tracking_ops_stabilize.c
-  tracking_ops_track.c
-  tracking_ops_utils.c
-  tracking_select.c
+  clip_buttons.cc
+  clip_dopesheet_draw.cc
+  clip_dopesheet_ops.cc
+  clip_draw.cc
+  clip_editor.cc
+  clip_graph_draw.cc
+  clip_graph_ops.cc
+  clip_ops.cc
+  clip_utils.cc
+  space_clip.cc
+  tracking_ops.cc
+  tracking_ops_detect.cc
+  tracking_ops_orient.cc
+  tracking_ops_plane.cc
+  tracking_ops_solve.cc
+  tracking_ops_stabilize.cc
+  tracking_ops_track.cc
+  tracking_ops_utils.cc
+  tracking_select.cc
 
-  clip_intern.h
-  tracking_ops_intern.h
+  clip_intern.hh
+  tracking_ops_intern.hh
 )
 
 set(LIB
+  PRIVATE bf::blenfont
   bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::blenlib
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::intern::guardedalloc
 )
 
-add_definitions(${GL_DEFINITIONS})
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
 blender_add_lib(bf_editor_space_clip "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_space_clip bf_rna)

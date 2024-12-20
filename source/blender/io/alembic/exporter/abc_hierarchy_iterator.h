@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 #include "ABC_alembic.h"
@@ -25,17 +10,15 @@
 
 #include <string>
 
-#include <Alembic/Abc/OArchive.h>
 #include <Alembic/Abc/OObject.h>
 
 struct Depsgraph;
-struct ID;
+struct Main;
 struct Object;
 
-namespace blender {
-namespace io {
-namespace alembic {
+namespace blender::io::alembic {
 
+class ABCAbstractWriter;
 class ABCHierarchyIterator;
 
 struct ABCWriterConstructorArgs {
@@ -54,12 +37,15 @@ class ABCHierarchyIterator : public AbstractHierarchyIterator {
   const AlembicExportParams &params_;
 
  public:
-  ABCHierarchyIterator(Depsgraph *depsgraph,
-                       ABCArchive *abc_archive_,
+  ABCHierarchyIterator(Main *bmain,
+                       Depsgraph *depsgraph,
+                       ABCArchive *abc_archive,
                        const AlembicExportParams &params);
 
   virtual void iterate_and_write() override;
   virtual std::string make_valid_name(const std::string &name) const override;
+
+  Alembic::Abc::OObject get_alembic_object(const std::string &export_path) const;
 
  protected:
   virtual bool mark_as_weak_export(const Object *object) const override;
@@ -78,15 +64,16 @@ class ABCHierarchyIterator : public AbstractHierarchyIterator {
   virtual AbstractHierarchyWriter *create_particle_writer(
       const HierarchyContext *context) override;
 
-  virtual void delete_object_writer(AbstractHierarchyWriter *writer) override;
+  virtual void release_writer(AbstractHierarchyWriter *writer) override;
 
  private:
   Alembic::Abc::OObject get_alembic_parent(const HierarchyContext *context) const;
   ABCWriterConstructorArgs writer_constructor_args(const HierarchyContext *context) const;
   void update_archive_bounding_box();
   void update_bounding_box_recursive(Imath::Box3d &bounds, const HierarchyContext *context);
+
+  ABCAbstractWriter *create_data_writer_for_object_type(
+      const HierarchyContext *context, const ABCWriterConstructorArgs &writer_args);
 };
 
-}  // namespace alembic
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::alembic

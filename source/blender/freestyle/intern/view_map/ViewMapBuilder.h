@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_VIEW_MAP_BUILDER_H__
-#define __FREESTYLE_VIEW_MAP_BUILDER_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -46,9 +33,7 @@
 #include "../winged_edge/WEdge.h"
 #include "../winged_edge/WXEdge.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -89,9 +74,9 @@ class ViewMapBuilder {
 
   inline ViewMapBuilder()
   {
-    _pProgressBar = NULL;
-    _pRenderMonitor = NULL;
-    _Grid = NULL;
+    _pProgressBar = nullptr;
+    _pRenderMonitor = nullptr;
+    _Grid = nullptr;
     _currentId = 1;
     _currentFId = 0;
     _currentSVertexId = 0;
@@ -103,33 +88,33 @@ class ViewMapBuilder {
   {
     if (_pViewEdgeBuilder) {
       delete _pViewEdgeBuilder;
-      _pViewEdgeBuilder = NULL;
+      _pViewEdgeBuilder = nullptr;
     }
   }
 
   /* Build Grid for ray casting */
-  /*! Build non-culled Grid in camera space for ray casting */
-  void BuildGrid(WingedEdge &we, const BBox<Vec3r> &bbox, unsigned int sceneNumFaces);
+  /** Build non-culled Grid in camera space for ray casting */
+  void BuildGrid(WingedEdge &we, const BBox<Vec3r> &bbox, uint sceneNumFaces);
 
-  /*! Compute Shapes from a WingedEdge containing a list of WShapes */
+  /** Compute Shapes from a WingedEdge containing a list of WShapes */
   void computeInitialViewEdges(WingedEdge &);
 
-  /*! Compute Cusps */
+  /** Compute Cusps */
   void computeCusps(ViewMap *ioViewMap);
 
-  /*! Detects cusps (for a single ViewEdge) among SVertices and builds a ViewVertex on top of each
+  /** Detects cusps (for a single ViewEdge) among SVertices and builds a ViewVertex on top of each
    * cusp SVertex We use a hysteresis approach to avoid noise.
    */
   void DetectCusps(ViewEdge *ioEdge);
 
-  /*! Sets the current viewpoint */
+  /** Sets the current viewpoint */
   inline void setViewpoint(const Vec3r &ivp)
   {
     _viewpoint = ivp;
     SilhouetteGeomEngine::setViewpoint(ivp);
   }
 
-  /*! Sets the current transformation
+  /** Sets the current transformation
    *    iModelViewMatrix
    *      The 4x4 model view matrix, in column major order (openGL like).
    *    iProjection matrix
@@ -154,7 +139,7 @@ class ViewMapBuilder {
     SilhouetteGeomEngine::setFrustum(iZnear, iZfar);
   }
 
-  /*! Builds the scene view map returns the list the view map
+  /** Builds the scene view map returns the list the view map
    *  it is up to the caller to delete this ViewMap
    *    iWRoot
    *      The root group node containing the WEdge structured scene
@@ -163,14 +148,14 @@ class ViewMapBuilder {
                         visibility_algo iAlgo,
                         real epsilon,
                         const BBox<Vec3r> &bbox,
-                        unsigned int sceneNumFaces);
+                        uint sceneNumFaces);
 
   void CullViewEdges(ViewMap *ioViewMap,
                      real viewProscenium[4],
                      real occluderProscenium[4],
                      bool extensiveFEdgeSearch = true);
 
-  /*! computes the intersection between all 2D feature edges of the scene.
+  /** computes the intersection between all 2D feature edges of the scene.
    *    ioViewMap
    *      The view map. It is modified by the method.
    *      The list of all features edges of the scene.
@@ -182,14 +167,14 @@ class ViewMapBuilder {
                             intersection_algo iAlgo = sweep_line,
                             real epsilon = 1.0e-06);
 
-  /*! Computes the 2D scene silhouette edges visibility
+  /** Computes the 2D scene silhouette edges visibility
    *    iGrid
    *      For the Ray Casting algorithm.
    */
   void ComputeEdgesVisibility(ViewMap *ioViewMap,
                               WingedEdge &we,
                               const BBox<Vec3r> &bbox,
-                              unsigned int sceneNumFaces,
+                              uint sceneNumFaces,
                               visibility_algo iAlgo = ray_casting,
                               real epsilon = 1.0e-6);
 
@@ -198,9 +183,9 @@ class ViewMapBuilder {
     _Grid = iGrid;
   }
 
-  /*! accessors */
+  /** accessors */
 
-  /*! Modifiers */
+  /** Modifiers */
   inline void setProgressBar(ProgressBar *iProgressBar)
   {
     _pProgressBar = iProgressBar;
@@ -217,10 +202,10 @@ class ViewMapBuilder {
   }
 
  protected:
-  /*! Computes intersections on all edges of the scene using a sweep line algorithm */
+  /** Computes intersections on all edges of the scene using a sweep line algorithm */
   void ComputeSweepLineIntersections(ViewMap *ioViewMap, real epsilon = 1.0e-6);
 
-  /*! Computes the 2D scene silhouette edges visibility using a ray casting. On each edge, a ray is
+  /** Computes the 2D scene silhouette edges visibility using a ray casting. On each edge, a ray is
    * cast to check its quantitative invisibility. The list of occluders are each time stored in the
    * tested edge. ioViewMap The view map. The 2D scene silhouette edges as FEdges. These edges have
    * already been splitted at their intersections points. Thus, these edges do not intersect
@@ -243,7 +228,7 @@ class ViewMapBuilder {
                                  bool cull,
                                  GridDensityProviderFactory &factory);
 
-  /*! Compute the visibility for the FEdge fe.
+  /** Compute the visibility for the FEdge fe.
    *  The occluders are added to fe occluders list.
    *    fe
    *      The FEdge
@@ -263,26 +248,21 @@ class ViewMapBuilder {
                                   real epsilon,
                                   set<ViewShape *> &oOccluders,
                                   Polygon3r **oaPolygon,
-                                  unsigned timestamp);
+                                  uint timestamp);
   // FIXME
-  void FindOccludee(
-      FEdge *fe, Grid *iGrid, real epsilon, Polygon3r **oaPolygon, unsigned timestamp);
+  void FindOccludee(FEdge *fe, Grid *iGrid, real epsilon, Polygon3r **oaPolygon, uint timestamp);
   void FindOccludee(FEdge *fe,
                     Grid *iGrid,
                     real epsilon,
                     Polygon3r **oaPolygon,
-                    unsigned timestamp,
+                    uint timestamp,
                     Vec3r &u,
                     Vec3r &A,
                     Vec3r &origin,
                     Vec3r &edgeDir,
                     vector<WVertex *> &faceVertices);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewMapBuilder")
-#endif
 };
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_VIEW_MAP_BUILDER_H__

@@ -94,10 +94,11 @@
 
 #include "ceres/cost_function.h"
 #include "ceres/dynamic_cost_function_to_functor.h"
+#include "ceres/internal/export.h"
 #include "ceres/internal/fixed_array.h"
 #include "ceres/internal/parameter_dims.h"
-#include "ceres/internal/port.h"
 #include "ceres/types.h"
+#include "glog/logging.h"
 
 namespace ceres {
 
@@ -144,8 +145,7 @@ class CostFunctionToFunctor {
 
     // Extract parameter block pointers from params.
     using Indices =
-        std::make_integer_sequence<int,
-                                   ParameterDims::kNumParameterBlocks>;
+        std::make_integer_sequence<int, ParameterDims::kNumParameterBlocks>;
     std::array<const T*, ParameterDims::kNumParameterBlocks> parameter_blocks =
         GetParameterPointers<T>(params, Indices());
 

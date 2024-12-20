@@ -33,8 +33,11 @@
 
 #include <memory>
 #include <vector>
-#include "ceres/sparse_matrix.h"
+
+#include "ceres/internal/disable_warnings.h"
 #include "ceres/internal/eigen.h"
+#include "ceres/internal/export.h"
+#include "ceres/sparse_matrix.h"
 #include "ceres/types.h"
 
 namespace ceres {
@@ -44,7 +47,7 @@ namespace internal {
 // manipulate sparse matrices in triplet (i,j,s) form.  This object is
 // inspired by the design of the cholmod_triplet struct used in the
 // SuiteSparse package and is memory layout compatible with it.
-class TripletSparseMatrix : public SparseMatrix {
+class CERES_NO_EXPORT TripletSparseMatrix final : public SparseMatrix {
  public:
   TripletSparseMatrix();
   TripletSparseMatrix(int num_rows, int num_cols, int max_num_nonzeros);
@@ -54,11 +57,11 @@ class TripletSparseMatrix : public SparseMatrix {
                       const std::vector<int>& cols,
                       const std::vector<double>& values);
 
-  explicit TripletSparseMatrix(const TripletSparseMatrix& orig);
+  TripletSparseMatrix(const TripletSparseMatrix& orig);
 
   TripletSparseMatrix& operator=(const TripletSparseMatrix& rhs);
 
-  virtual ~TripletSparseMatrix();
+  ~TripletSparseMatrix() override;
 
   // Implementation of the SparseMatrix interface.
   void SetZero() final;
@@ -68,11 +71,13 @@ class TripletSparseMatrix : public SparseMatrix {
   void ScaleColumns(const double* scale) final;
   void ToDenseMatrix(Matrix* dense_matrix) const final;
   void ToTextFile(FILE* file) const final;
+  // clang-format off
   int num_rows()        const final   { return num_rows_;     }
   int num_cols()        const final   { return num_cols_;     }
   int num_nonzeros()    const final   { return num_nonzeros_; }
   const double* values()  const final { return values_.get(); }
   double* mutable_values() final      { return values_.get(); }
+  // clang-format on
   void set_num_nonzeros(int num_nonzeros);
 
   // Increase max_num_nonzeros and correspondingly increase the size
@@ -94,11 +99,13 @@ class TripletSparseMatrix : public SparseMatrix {
   // bounds are dropped and the num_non_zeros changed accordingly.
   void Resize(int new_num_rows, int new_num_cols);
 
+  // clang-format off
   int max_num_nonzeros() const { return max_num_nonzeros_; }
   const int* rows()      const { return rows_.get();       }
   const int* cols()      const { return cols_.get();       }
   int* mutable_rows()          { return rows_.get();       }
   int* mutable_cols()          { return cols_.get();       }
+  // clang-format on
 
   // Returns true if the entries of the matrix obey the row, column,
   // and column size bounds and false otherwise.
@@ -109,8 +116,8 @@ class TripletSparseMatrix : public SparseMatrix {
   // Build a sparse diagonal matrix of size num_rows x num_rows from
   // the array values. Entries of the values array are copied into the
   // sparse matrix.
-  static TripletSparseMatrix* CreateSparseDiagonalMatrix(const double* values,
-                                                         int num_rows);
+  static std::unique_ptr<TripletSparseMatrix> CreateSparseDiagonalMatrix(
+      const double* values, int num_rows);
 
   // Options struct to control the generation of random
   // TripletSparseMatrix objects.
@@ -126,9 +133,7 @@ class TripletSparseMatrix : public SparseMatrix {
   // Create a random CompressedRowSparseMatrix whose entries are
   // normally distributed and whose structure is determined by
   // RandomMatrixOptions.
-  //
-  // Caller owns the result.
-  static TripletSparseMatrix* CreateRandomMatrix(
+  static std::unique_ptr<TripletSparseMatrix> CreateRandomMatrix(
       const TripletSparseMatrix::RandomMatrixOptions& options);
 
  private:
@@ -151,5 +156,7 @@ class TripletSparseMatrix : public SparseMatrix {
 
 }  // namespace internal
 }  // namespace ceres
+
+#include "ceres/internal/reenable_warnings.h"
 
 #endif  // CERES_INTERNAL_TRIPLET_SPARSE_MATRIX_H__

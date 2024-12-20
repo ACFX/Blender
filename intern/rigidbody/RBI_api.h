@@ -1,24 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation,
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup RigidBody
+ * \ingroup intern_rigidbody
  * \brief Rigid Body API for interfacing with external Physics Engines
  */
 
@@ -30,10 +15,10 @@ extern "C" {
 #endif
 
 /* API Notes:
- * Currently, this API is optimised for Bullet RigidBodies, and doesn't
+ * Currently, this API is optimized for Bullet RigidBodies, and doesn't
  * take into account other Physics Engines. Some tweaking may be necessary
  * to allow other systems to be used, in particular there may be references
- * to datatypes that aren't used here...
+ * to data-types that aren't used here...
  *
  * -- Joshua Leung (22 June 2010)
  */
@@ -64,7 +49,7 @@ typedef struct rbConstraint rbConstraint;
 /* Setup ---------------------------- */
 
 /* Create a new dynamics world instance */
-// TODO: add args to set the type of constraint solvers, etc.
+/* TODO: add args to set the type of constraint solvers, etc. */
 rbDynamicsWorld *RB_dworld_new(const float gravity[3]);
 
 /* Delete the given dynamics world, and free any extra data it may require */
@@ -200,10 +185,12 @@ void RB_body_set_scale(rbRigidBody *body, const float scale[3]);
 
 /* ............ */
 
-/* Get RigidBody's position as vector */
+/* Get RigidBody's position as a vector */
 void RB_body_get_position(rbRigidBody *body, float v_out[3]);
-/* Get RigidBody's orientation as quaternion */
+/* Get RigidBody's orientation as a quaternion */
 void RB_body_get_orientation(rbRigidBody *body, float v_out[4]);
+/* Get RigidBody's local scale as a vector */
+void RB_body_get_scale(rbRigidBody *object, float v_out[3]);
 
 /* ............ */
 
@@ -223,7 +210,7 @@ rbCollisionShape *RB_shape_new_cylinder(float radius, float height);
 /* Setup (Convex Hull) ------------ */
 
 rbCollisionShape *RB_shape_new_convex_hull(
-    float *verts, int stride, int count, float margin, bool *can_embed);
+    const float *verts, int stride, int count, float margin, bool *can_embed);
 
 /* Setup (Triangle Mesh) ---------- */
 
@@ -238,6 +225,14 @@ rbCollisionShape *RB_shape_new_trimesh(rbMeshData *mesh);
 /* 2b - GImpact Meshes */
 rbCollisionShape *RB_shape_new_gimpact_mesh(rbMeshData *mesh);
 
+/* Compound Shape ---------------- */
+
+rbCollisionShape *RB_shape_new_compound(void);
+void RB_compound_add_child_shape(rbCollisionShape *collisionShape,
+                                 rbCollisionShape *shape,
+                                 const float loc[3],
+                                 const float rot[4]);
+
 /* Cleanup --------------------------- */
 
 void RB_shape_delete(rbCollisionShape *shape);
@@ -249,11 +244,11 @@ float RB_shape_get_margin(rbCollisionShape *shape);
 void RB_shape_set_margin(rbCollisionShape *shape, float value);
 
 void RB_shape_trimesh_update(rbCollisionShape *shape,
-                             float *vertices,
+                             const float *vertices,
                              int num_verts,
                              int vert_stride,
-                             float min[3],
-                             float max[3]);
+                             const float min[3],
+                             const float max[3]);
 
 /* ********************************** */
 /* Constraints */
@@ -266,7 +261,7 @@ void RB_dworld_add_constraint(rbDynamicsWorld *world, rbConstraint *con, int dis
 /* Remove Rigid Body Constraint from simulation world */
 void RB_dworld_remove_constraint(rbDynamicsWorld *world, rbConstraint *con);
 
-rbConstraint *RB_constraint_new_point(float pivot[3], rbRigidBody *rb1, rbRigidBody *rb2);
+rbConstraint *RB_constraint_new_point(const float pivot[3], rbRigidBody *rb1, rbRigidBody *rb2);
 rbConstraint *RB_constraint_new_fixed(float pivot[3],
                                       float orn[4],
                                       rbRigidBody *rb1,

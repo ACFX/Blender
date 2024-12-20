@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __BLI_LISTBASE_WRAPPER_HH__
-#define __BLI_LISTBASE_WRAPPER_HH__
+#pragma once
 
 /** \file
  * \ingroup bli
@@ -27,44 +14,43 @@
  */
 
 #include "BLI_listbase.h"
+#include "BLI_vector.hh"
+
 #include "DNA_listBase.h"
 
 namespace blender {
 
-template<typename T> class ListBaseWrapper {
+template<typename LB, typename T> class ListBaseWrapperTemplate {
  private:
-  ListBase *listbase_;
+  LB *listbase_;
 
  public:
-  ListBaseWrapper(ListBase *listbase) : listbase_(listbase)
+  ListBaseWrapperTemplate(LB *listbase) : listbase_(listbase)
   {
     BLI_assert(listbase);
   }
 
-  ListBaseWrapper(ListBase &listbase) : ListBaseWrapper(&listbase)
-  {
-  }
+  ListBaseWrapperTemplate(LB &listbase) : ListBaseWrapperTemplate(&listbase) {}
 
   class Iterator {
    private:
-    ListBase *listbase_;
+    LB *listbase_;
     T *current_;
 
    public:
-    Iterator(ListBase *listbase, T *current) : listbase_(listbase), current_(current)
-    {
-    }
+    Iterator(LB *listbase, T *current) : listbase_(listbase), current_(current) {}
 
     Iterator &operator++()
     {
-      current_ = current_->next;
+      /* Some types store `next/prev` using `void *`, so cast is necessary. */
+      current_ = static_cast<T *>(current_->next);
       return *this;
     }
 
     Iterator operator++(int)
     {
       Iterator iterator = *this;
-      ++*this;
+      ++(*this);
       return iterator;
     }
 
@@ -81,7 +67,7 @@ template<typename T> class ListBaseWrapper {
 
   Iterator begin() const
   {
-    return Iterator(listbase_, (T *)listbase_->first);
+    return Iterator(listbase_, static_cast<T *>(listbase_->first));
   }
 
   Iterator end() const
@@ -89,16 +75,16 @@ template<typename T> class ListBaseWrapper {
     return Iterator(listbase_, nullptr);
   }
 
-  T get(uint index) const
+  T *get(uint index) const
   {
     void *ptr = BLI_findlink(listbase_, index);
     BLI_assert(ptr);
-    return (T *)ptr;
+    return static_cast<T *>(ptr);
   }
 
-  uint index_of(const T *value) const
+  int64_t index_of(const T *value) const
   {
-    uint index = 0;
+    int64_t index = 0;
     for (T *ptr : *this) {
       if (ptr == value) {
         return index;
@@ -106,10 +92,37 @@ template<typename T> class ListBaseWrapper {
       index++;
     }
     BLI_assert(false);
-    return 0;
+    return -1;
   }
 };
 
-} /* namespace blender */
+template<typename T> using ListBaseWrapper = ListBaseWrapperTemplate<ListBase, T>;
+template<typename T> using ConstListBaseWrapper = ListBaseWrapperTemplate<const ListBase, const T>;
 
-#endif /* __BLI_LISTBASE_WRAPPER_HH__ */
+/**
+ * Convert a ListBase to a Vector.
+ */
+template<typename T> Vector<T *> listbase_to_vector(ListBase &list)
+{
+  Vector<T *> vector;
+
+  for (T *item : ListBaseWrapper<T>(list)) {
+    vector.append(item);
+  }
+  return vector;
+}
+
+/**
+ * Convert a ListBase to a Vector.
+ */
+template<typename T> Vector<T *> listbase_to_vector(const ListBase &list)
+{
+  Vector<T *> vector;
+
+  for (T *item : ConstListBaseWrapper<T>(list)) {
+    vector.append(item);
+  }
+  return vector;
+}
+
+} /* namespace blender */

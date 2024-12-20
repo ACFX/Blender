@@ -1,6 +1,12 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
 
 set(INC
   ..
+)
+
+set(INC_SYS
 )
 
 set(SRC

@@ -1,25 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- * Original author: Laurence
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup iksolver
+ * \ingroup intern_iksolver
  */
 
 #pragma once
@@ -48,7 +32,6 @@
  * The ordering of these transformations is vital, you must
  * use exactly the same transformations when displaying the segments
  */
-
 class IK_QSegment {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -171,20 +154,14 @@ class IK_QSegment {
 
   // update the angles using the dTheta's computed using the jacobian matrix
   virtual bool UpdateAngle(const IK_QJacobian &, Vector3d &, bool *) = 0;
-  virtual void Lock(int, IK_QJacobian &, Vector3d &)
-  {
-  }
+  virtual void Lock(int, IK_QJacobian &, Vector3d &) {}
   virtual void UpdateAngleApply() = 0;
 
   // set joint limits
-  virtual void SetLimit(int, double, double)
-  {
-  }
+  virtual void SetLimit(int, double, double) {}
 
   // set joint weights (per axis)
-  virtual void SetWeight(int, double)
-  {
-  }
+  virtual void SetWeight(int, double) {}
 
   virtual void SetBasis(const Matrix3d &basis)
   {
@@ -268,9 +245,7 @@ class IK_QNullSegment : public IK_QSegment {
   {
     return false;
   }
-  void UpdateAngleApply()
-  {
-  }
+  void UpdateAngleApply() {}
 
   Vector3d Axis(int) const
   {

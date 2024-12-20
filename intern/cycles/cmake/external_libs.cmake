@@ -1,49 +1,36 @@
-###########################################################################
-# Precompiled libraries tips and hints, for find_package().
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
 
-if(CYCLES_STANDALONE_REPOSITORY)
-  if(APPLE OR WIN32)
-    include(precompiled_libs)
+###########################################################################
+# SDL
+###########################################################################
+
+if(WITH_CYCLES_STANDALONE AND WITH_CYCLES_STANDALONE_GUI)
+  # We can't use the version from the Blender precompiled libraries because
+  # it does not include the video subsystem.
+  find_package(SDL2 REQUIRED)
+  set_and_warn_library_found("SDL" SDL2_FOUND WITH_CYCLES_STANDALONE_GUI)
+
+  if(SDL2_FOUND)
+    include_directories(
+      SYSTEM
+      ${SDL2_INCLUDE_DIRS}
+    )
   endif()
 endif()
 
 ###########################################################################
-# GLUT
-
-if(WITH_CYCLES_STANDALONE AND WITH_CYCLES_STANDALONE_GUI)
-  set(GLUT_ROOT_PATH ${CYCLES_GLUT})
-
-  find_package(GLUT)
-  message(STATUS "GLUT_FOUND=${GLUT_FOUND}")
-
-  include_directories(
-    SYSTEM
-    ${GLUT_INCLUDE_DIR}
-  )
-endif()
-
-###########################################################################
-# GLEW
-
-# Workaround for unconventional variable name use in Blender.
-if(NOT CYCLES_STANDALONE_REPOSITORY)
-  set(GLEW_INCLUDE_DIR "${GLEW_INCLUDE_PATH}")
-endif()
-
-if(WITH_CYCLES_STANDALONE)
-  set(CYCLES_APP_GLEW_LIBRARY ${BLENDER_GLEW_LIBRARIES})
-endif()
-
-###########################################################################
 # CUDA
+###########################################################################
 
-if(WITH_CYCLES_CUDA_BINARIES OR NOT WITH_CUDA_DYNLOAD)
+if(WITH_CYCLES_DEVICE_CUDA AND (WITH_CYCLES_CUDA_BINARIES OR NOT WITH_CUDA_DYNLOAD))
   find_package(CUDA) # Try to auto locate CUDA toolkit
+  set_and_warn_library_found("CUDA compiler" CUDA_FOUND WITH_CYCLES_CUDA_BINARIES)
+
   if(CUDA_FOUND)
-    message(STATUS "CUDA nvcc = ${CUDA_NVCC_EXECUTABLE}")
+    message(STATUS "Found CUDA ${CUDA_NVCC_EXECUTABLE} (${CUDA_VERSION})")
   else()
-    message(STATUS "CUDA compiler not found, disabling WITH_CYCLES_CUDA_BINARIES")
-    set(WITH_CYCLES_CUDA_BINARIES OFF)
     if(NOT WITH_CUDA_DYNLOAD)
       message(STATUS "Additionally falling back to dynamic CUDA load")
       set(WITH_CUDA_DYNLOAD ON)
@@ -51,101 +38,93 @@ if(WITH_CYCLES_CUDA_BINARIES OR NOT WITH_CUDA_DYNLOAD)
   endif()
 endif()
 
-# Packages which are being found by Blender when building from inside Blender
-# source code. but which we need to take care of when building Cycles from a
-# standalone repository
-if(CYCLES_STANDALONE_REPOSITORY)
-  # PThreads
-  # TODO(sergey): Bloody exception, handled in precompiled_libs.cmake.
-  if(NOT WIN32)
-    set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-    find_package(Threads REQUIRED)
-    set(PTHREADS_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
-  endif()
+###########################################################################
+# HIP
+###########################################################################
 
-  ####
-  # OpenGL
+if(WITH_CYCLES_DEVICE_HIP)
+  if(WITH_CYCLES_HIP_BINARIES OR WITH_CYCLES_DEVICE_HIPRT)
+    # Need at least HIP 5.5 to solve compiler bug affecting the kernel.
+    find_package(HIP 5.5.0)
+    set_and_warn_library_found("HIP compiler" HIP_FOUND WITH_CYCLES_HIP_BINARIES)
 
-  # TODO(sergey): We currently re-use the same variable name as we use
-  # in Blender. Ideally we need to make it CYCLES_GL_LIBRARIES.
-  find_package(OpenGL REQUIRED)
-  find_package(GLEW REQUIRED)
-  list(APPEND BLENDER_GL_LIBRARIES
-    "${OPENGL_gl_LIBRARY}"
-    "${OPENGL_glu_LIBRARY}"
-    "${GLEW_LIBRARY}"
-  )
-
-  ####
-  # OpenImageIO
-  find_package(OpenImageIO REQUIRED)
-  if(OPENIMAGEIO_PUGIXML_FOUND)
-    set(PUGIXML_INCLUDE_DIR "${OPENIMAGEIO_INCLUDE_DIR/OpenImageIO}")
-    set(PUGIXML_LIBRARIES "")
-  else()
-    find_package(PugiXML REQUIRED)
-  endif()
-
-  # OIIO usually depends on OpenEXR, so find this library
-  # but don't make it required.
-  find_package(OpenEXR)
-
-  ####
-  # OpenShadingLanguage
-  if(WITH_CYCLES_OSL)
-    find_package(OpenShadingLanguage REQUIRED)
-    find_package(LLVM REQUIRED)
-  endif()
-
-  ####
-  # OpenColorIO
-  if(WITH_OPENCOLORIO)
-    find_package(OpenColorIO REQUIRED)
-  endif()
-
-  ####
-  # Boost
-  set(__boost_packages filesystem regex system thread date_time)
-  if(WITH_CYCLES_NETWORK)
-    list(APPEND __boost_packages serialization)
-  endif()
-  if(WITH_CYCLES_OSL)
-    # TODO(sergey): This is because of the way how our precompiled
-    # libraries works, could be different for someone's else libs..
-    if(APPLE OR MSVC)
-      list(APPEND __boost_packages wave)
-    elseif(NOT (${OSL_LIBRARY_VERSION_MAJOR} EQUAL "1" AND ${OSL_LIBRARY_VERSION_MINOR} LESS "6"))
-      list(APPEND __boost_packages wave)
+    if(HIP_FOUND)
+      message(STATUS "Found HIP ${HIP_HIPCC_EXECUTABLE} (${HIP_VERSION})")
     endif()
   endif()
-  find_package(Boost 1.48 COMPONENTS ${__boost_packages} REQUIRED)
-  if(NOT Boost_FOUND)
-    # Try to find non-multithreaded if -mt not found, this flag
-    # doesn't matter for us, it has nothing to do with thread
-    # safety, but keep it to not disturb build setups.
-    set(Boost_USE_MULTITHREADED OFF)
-    find_package(Boost 1.48 COMPONENTS ${__boost_packages})
-  endif()
-  unset(__boost_packages)
-  set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
-  set(BOOST_LIBRARIES ${Boost_LIBRARIES})
-  set(BOOST_LIBPATH ${Boost_LIBRARY_DIRS})
-  set(BOOST_DEFINITIONS "-DBOOST_ALL_NO_LIB")
 
-  ####
-  # Embree
-  if(WITH_CYCLES_EMBREE)
-    find_package(Embree 3.8.0 REQUIRED)
+  # HIP RT
+  if(WITH_CYCLES_DEVICE_HIP AND WITH_CYCLES_DEVICE_HIPRT)
+    if(DEFINED LIBDIR)
+      set(HIPRT_ROOT_DIR ${LIBDIR}/hiprt)
+    endif()
+    find_package(HIPRT)
+    set_and_warn_library_found("HIP RT" HIPRT_FOUND WITH_CYCLES_DEVICE_HIPRT)
+  endif()
+endif()
+
+if(NOT WITH_CYCLES_DEVICE_HIP)
+  set(WITH_CYCLES_DEVICE_HIPRT OFF)
+endif()
+
+if(NOT WITH_HIP_DYNLOAD)
+  set(WITH_HIP_DYNLOAD ON)
+endif()
+
+###########################################################################
+# Metal
+###########################################################################
+
+if(WITH_CYCLES_DEVICE_METAL)
+  find_library(METAL_LIBRARY Metal)
+
+  # This file was added in the 12.0 SDK, use it as a way to detect the version.
+  if(METAL_LIBRARY)
+    if(EXISTS "${METAL_LIBRARY}/Headers/MTLFunctionStitching.h")
+      set(METAL_FOUND ON)
+    else()
+      message(STATUS "Metal version too old, must be SDK 12.0 or newer")
+      set(METAL_FOUND OFF)
+    endif()
   endif()
 
-  ####
-  # Logging
-  if(WITH_CYCLES_LOGGING)
-    find_package(Glog REQUIRED)
-    find_package(Gflags REQUIRED)
+  set_and_warn_library_found("Metal" METAL_FOUND WITH_CYCLES_DEVICE_METAL)
+  if(METAL_FOUND)
+    message(STATUS "Found Metal: ${METAL_LIBRARY}")
+  endif()
+endif()
+
+###########################################################################
+# oneAPI
+###########################################################################
+
+if(WITH_CYCLES_DEVICE_ONEAPI OR EMBREE_SYCL_SUPPORT)
+  # Find packages for even when WITH_CYCLES_DEVICE_ONEAPI is OFF, as it's
+  # needed for linking to Embree with SYCL support.
+  find_package(SYCL)
+  find_package(LevelZero)
+
+  if(WITH_CYCLES_DEVICE_ONEAPI)
+    set_and_warn_library_found("oneAPI" SYCL_FOUND WITH_CYCLES_DEVICE_ONEAPI)
+    set_and_warn_library_found("Level Zero" LEVEL_ZERO_FOUND WITH_CYCLES_DEVICE_ONEAPI)
+    if(NOT (SYCL_FOUND AND SYCL_VERSION VERSION_GREATER_EQUAL 6.0 AND LEVEL_ZERO_FOUND))
+      message(STATUS "SYCL 6.0+ or Level Zero not found, disabling WITH_CYCLES_DEVICE_ONEAPI")
+      set(WITH_CYCLES_DEVICE_ONEAPI OFF)
+    endif()
+  endif()
+endif()
+
+if(WITH_CYCLES_DEVICE_ONEAPI AND WITH_CYCLES_ONEAPI_BINARIES)
+  if(NOT OCLOC_INSTALL_DIR)
+    get_filename_component(_sycl_compiler_root ${SYCL_COMPILER} DIRECTORY)
+    get_filename_component(OCLOC_INSTALL_DIR "${_sycl_compiler_root}/../lib/ocloc" ABSOLUTE)
+    unset(_sycl_compiler_root)
   endif()
 
-  unset(_lib_DIR)
-else()
-  set(LLVM_LIBRARIES ${LLVM_LIBRARY})
+  if(NOT EXISTS ${OCLOC_INSTALL_DIR})
+    set(OCLOC_FOUND OFF)
+    message(STATUS "oneAPI ocloc not found in ${OCLOC_INSTALL_DIR}."
+                   " A different ocloc directory can be set using OCLOC_INSTALL_DIR cmake variable.")
+    set_and_warn_library_found("ocloc" OCLOC_FOUND WITH_CYCLES_ONEAPI_BINARIES)
+  endif()
 endif()

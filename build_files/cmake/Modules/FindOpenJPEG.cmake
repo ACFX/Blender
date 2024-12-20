@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2011 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find OpenJPEG library
 # Find the native OpenJPEG includes and library
 # This module defines
@@ -11,27 +15,20 @@
 # also defined, but not for general use are
 #  OPENJPEG_LIBRARY, where to find the OpenJPEG library.
 
-#=============================================================================
-# Copyright 2011 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
+# If `OPENJPEG_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED OPENJPEG_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{OPENJPEG_ROOT_DIR})
+  set(OPENJPEG_ROOT_DIR $ENV{OPENJPEG_ROOT_DIR})
+else()
+  set(OPENJPEG_ROOT_DIR "")
+endif()
 
-# If OPENJPEG_ROOT_DIR was defined in the environment, use it.
-IF(NOT OPENJPEG_ROOT_DIR AND NOT $ENV{OPENJPEG_ROOT_DIR} STREQUAL "")
-  SET(OPENJPEG_ROOT_DIR $ENV{OPENJPEG_ROOT_DIR})
-ENDIF()
-
-SET(_openjpeg_SEARCH_DIRS
+set(_openjpeg_SEARCH_DIRS
   ${OPENJPEG_ROOT_DIR}
 )
 
-FIND_PATH(OPENJPEG_INCLUDE_DIR
+find_path(OPENJPEG_INCLUDE_DIR
   NAMES
     openjpeg.h
   HINTS
@@ -51,7 +48,7 @@ FIND_PATH(OPENJPEG_INCLUDE_DIR
     openjpeg-2.0
 )
 
-FIND_LIBRARY(OPENJPEG_LIBRARY
+find_library(OPENJPEG_LIBRARY
   NAMES
     openjp2
   HINTS
@@ -62,18 +59,18 @@ FIND_LIBRARY(OPENJPEG_LIBRARY
 
 # handle the QUIETLY and REQUIRED arguments and set OPENJPEG_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenJPEG DEFAULT_MSG
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(OpenJPEG DEFAULT_MSG
     OPENJPEG_LIBRARY OPENJPEG_INCLUDE_DIR)
 
-IF(OPENJPEG_FOUND)
-  SET(OPENJPEG_LIBRARIES ${OPENJPEG_LIBRARY})
-  SET(OPENJPEG_INCLUDE_DIRS ${OPENJPEG_INCLUDE_DIR})
-ENDIF(OPENJPEG_FOUND)
+if(OPENJPEG_FOUND)
+  set(OPENJPEG_LIBRARIES ${OPENJPEG_LIBRARY})
+  set(OPENJPEG_INCLUDE_DIRS ${OPENJPEG_INCLUDE_DIR})
+endif()
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   OPENJPEG_INCLUDE_DIR
   OPENJPEG_LIBRARY
 )
 
-UNSET(_openjpeg_SEARCH_DIRS)
+unset(_openjpeg_SEARCH_DIRS)

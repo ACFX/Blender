@@ -37,25 +37,18 @@ set LLVM_DIR=
 :DetectionComplete	
 	set CC=%LLVM_DIR%\bin\clang-cl
 	set CXX=%LLVM_DIR%\bin\clang-cl
-	if "%BUILD_VS_YEAR%" == "2019" (
+	if "%PROCESSOR_ARCHITECTURE%" == "ARM64" (
+		set CFLAGS=-m64
+		set CXXFLAGS=-m64
+	) else (
 		rem build and tested against 2019 16.2
 		set CFLAGS=-m64 -fmsc-version=1922
 		set CXXFLAGS=-m64 -fmsc-version=1922
-	) else (
-		rem build and tested against 2017 15.7
-		set CFLAGS=-m64 -fmsc-version=1914
-		set CXXFLAGS=-m64 -fmsc-version=1914
 	)
-	if "%WITH_ASAN%"=="1" (
-		set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% -DWITH_COMPILER_ASAN=On
-	)	
 )
 
 if "%WITH_ASAN%"=="1" (
-	if "%WITH_CLANG%" == "" (
-		echo ASAN is only supported with clang.
-		exit /b 1 
-	)
+	set BUILD_CMAKE_ARGS=%BUILD_CMAKE_ARGS% -DWITH_COMPILER_ASAN=On
 )
 
 if NOT "%verbose%" == "" (
@@ -69,14 +62,14 @@ if NOT EXIST %BUILD_DIR%\nul (
 if "%MUST_CLEAN%"=="1" (
 	echo Cleaning %BUILD_DIR%
 	cd %BUILD_DIR%
-	%CMAKE% cmake --build . --config Clean
+	"%CMAKE%" --build . --config Clean
 )
 
 if NOT EXIST %BUILD_DIR%\build.ninja set MUST_CONFIGURE=1
 if "%NOBUILD%"=="1" set MUST_CONFIGURE=1
 
 if "%MUST_CONFIGURE%"=="1" (
-	cmake ^
+	"%CMAKE%" ^
 		%BUILD_CMAKE_ARGS% ^
 		-H%BLENDER_DIR% ^
 		-B%BUILD_DIR% 
@@ -92,5 +85,5 @@ echo if "%%VSCMD_VER%%" == "" ^( >> %BUILD_DIR%\rebuild.cmd
 echo   call "%VCVARS%" %BUILD_ARCH% >> %BUILD_DIR%\rebuild.cmd
 echo ^) >> %BUILD_DIR%\rebuild.cmd
 echo echo %%TIME%% ^> buildtime.txt >> %BUILD_DIR%\rebuild.cmd
-echo ninja install >> %BUILD_DIR%\rebuild.cmd 
+echo ninja install %%* >> %BUILD_DIR%\rebuild.cmd
 echo echo %%TIME%% ^>^> buildtime.txt >> %BUILD_DIR%\rebuild.cmd

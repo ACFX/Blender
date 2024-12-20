@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -24,39 +12,74 @@
 #include "COLLADASWSource.h"
 
 #include "DNA_action_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 
-#include "BKE_action.h"
-#include "BKE_armature.h"
-#include "BKE_global.h"
-#include "BKE_mesh.h"
+#include "BKE_action.hh"
+#include "BKE_armature.hh"
+#include "BKE_global.hh"
+#include "BKE_mesh.hh"
 
-#include "ED_armature.h"
+#include "ED_armature.hh"
 
 #include "BLI_listbase.h"
+#include "BLI_math_matrix.h"
 
 #include "ArmatureExporter.h"
 #include "GeometryExporter.h"
 #include "SceneExporter.h"
 
-// write bone nodes
+void ArmatureExporter::add_bone_collections(Object *ob_arm, COLLADASW::Node &node)
+{
+  bArmature *armature = (bArmature *)ob_arm->data;
+
+  /* Because our importer assumes that "extras" tags have a unique name, it's not possible to
+   * export a `<bonecollection>` element per bone collection. This is why all the names are stored
+   * in one element, newline-separated. */
+
+  std::stringstream collection_stream;
+  std::stringstream visible_stream;
+  for (const BoneCollection *bcoll : armature->collections_span()) {
+    collection_stream << bcoll->name << "\n";
+
+    if (bcoll->flags & BONE_COLLECTION_VISIBLE) {
+      visible_stream << bcoll->name << "\n";
+    }
+  }
+
+  std::string collection_names = collection_stream.str();
+  if (collection_names.length() > 1) {
+    collection_names.pop_back(); /* Pop off the last `\n`. */
+    node.addExtraTechniqueParameter("blender", "collections", collection_names);
+  }
+
+  std::string visible_names = visible_stream.str();
+  if (visible_names.length() > 1) {
+    visible_names.pop_back(); /* Pop off the last `\n`. */
+    node.addExtraTechniqueParameter("blender", "visible_collections", visible_names);
+  }
+
+  if (armature->runtime.active_collection) {
+    node.addExtraTechniqueParameter(
+        "blender", "active_collection", std::string(armature->active_collection_name));
+  }
+}
+
 void ArmatureExporter::add_armature_bones(Object *ob_arm,
                                           ViewLayer *view_layer,
                                           SceneExporter *se,
                                           std::vector<Object *> &child_objects)
 
 {
-  // write bone nodes
+  /* write bone nodes */
 
   bArmature *armature = (bArmature *)ob_arm->data;
-  bool is_edited = armature->edbo != NULL;
+  bool is_edited = armature->edbo != nullptr;
 
   if (!is_edited) {
     ED_armature_to_edit(armature);
   }
 
-  for (Bone *bone = (Bone *)armature->bonebase.first; bone; bone = bone->next) {
+  LISTBASE_FOREACH (Bone *, bone, &armature->bonebase) {
     add_bone_node(bone, ob_arm, se, child_objects);
   }
 
@@ -74,7 +97,7 @@ void ArmatureExporter::write_bone_URLs(COLLADASW::InstanceController &ins,
     ins.addSkeleton(COLLADABU::URI(COLLADABU::Utils::EMPTY_STRING, joint_id));
   }
   else {
-    for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
+    LISTBASE_FOREACH (Bone *, child, &bone->childbase) {
       write_bone_URLs(ins, ob_arm, child);
     }
   }
@@ -90,14 +113,13 @@ bool ArmatureExporter::add_instance_controller(Object *ob)
   COLLADASW::InstanceController ins(mSW);
   ins.setUrl(COLLADASW::URI(COLLADABU::Utils::EMPTY_STRING, controller_id));
 
-  Mesh *me = (Mesh *)ob->data;
-  if (!me->dvert) {
+  Mesh *mesh = (Mesh *)ob->data;
+  if (mesh->deform_verts().is_empty()) {
     return false;
   }
 
-  // write root bone URLs
-  Bone *bone;
-  for (bone = (Bone *)arm->bonebase.first; bone; bone = bone->next) {
+  /* write root bone URLs */
+  LISTBASE_FOREACH (Bone *, bone, &arm->bonebase) {
     write_bone_URLs(ins, ob_arm, bone);
   }
 
@@ -144,7 +166,6 @@ void ArmatureExporter::find_objects_using_armature(Object *ob_arm,
 }
 #endif
 
-// parent_mat is armature-space
 void ArmatureExporter::add_bone_node(Bone *bone,
                                      Object *ob_arm,
                                      SceneExporter *se,
@@ -168,8 +189,15 @@ void ArmatureExporter::add_bone_node(Bone *bone,
           node.addExtraTechniqueParameter("blender", "connect", true);
         }
       }
-      std::string layers = BoneExtended::get_bone_layers(bone->layer);
-      node.addExtraTechniqueParameter("blender", "layer", layers);
+
+      std::string collection_names = "";
+      LISTBASE_FOREACH (const BoneCollectionReference *, bcoll_ref, &bone->runtime.collections) {
+        collection_names += std::string(bcoll_ref->bcoll->name) + "\n";
+      }
+      if (collection_names.length() > 1) {
+        collection_names.pop_back(); /* Pop off the last `\n`. */
+        node.addExtraTechniqueParameter("blender", "", collection_names, "", "collections");
+      }
 
       bArmature *armature = (bArmature *)ob_arm->data;
       EditBone *ebone = bc_get_edit_bone(armature, bone->name);
@@ -197,7 +225,7 @@ void ArmatureExporter::add_bone_node(Bone *bone,
 
     add_bone_transform(ob_arm, bone, node);
 
-    // Write nodes of childobjects, remove written objects from list
+    /* Write nodes of child-objects, remove written objects from list. */
     std::vector<Object *>::iterator iter = child_objects.begin();
 
     while (iter != child_objects.end()) {
@@ -206,20 +234,20 @@ void ArmatureExporter::add_bone_node(Bone *bone,
         float backup_parinv[4][4];
         copy_m4_m4(backup_parinv, ob->parentinv);
 
-        // crude, temporary change to parentinv
-        // so transform gets exported correctly.
+        /* Crude, temporary change to parentinv
+         * so transform gets exported correctly. */
 
-        // Add bone tail- translation... don't know why
-        // bone parenting is against the tail of a bone
-        // and not it's head, seems arbitrary.
+        /* Add bone tail- translation... don't know why
+         * bone parenting is against the tail of a bone
+         * and not its head, seems arbitrary. */
         ob->parentinv[3][1] += bone->length;
 
-        // OPEN_SIM_COMPATIBILITY
-        // TODO: when such objects are animated as
-        // single matrix the tweak must be applied
-        // to the result.
+        /* OPEN_SIM_COMPATIBILITY
+         * TODO: when such objects are animated as
+         * single matrix the tweak must be applied
+         * to the result. */
         if (export_settings.get_open_sim()) {
-          // tweak objects parentinverse to match compatibility
+          /* Tweak objects parent-inverse to match compatibility. */
           float temp[4][4];
 
           copy_m4_m4(temp, bone->arm_mat);
@@ -237,13 +265,13 @@ void ArmatureExporter::add_bone_node(Bone *bone,
       }
     }
 
-    for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
+    LISTBASE_FOREACH (Bone *, child, &bone->childbase) {
       add_bone_node(child, ob_arm, se, child_objects);
     }
     node.end();
   }
   else {
-    for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
+    LISTBASE_FOREACH (Bone *, child, &bone->childbase) {
       add_bone_node(child, ob_arm, se, child_objects);
     }
   }
@@ -273,7 +301,7 @@ void ArmatureExporter::add_bone_transform(Object *ob_arm, Bone *bone, COLLADASW:
 
   if (!has_restmat) {
 
-    /* Have no restpose matrix stored, try old style <= Blender 2.78 */
+    /* Have no rest-pose matrix stored, try old style <= Blender 2.78. */
 
     bc_create_restpose_mat(this->export_settings, bone, bone_rest_mat, bone->arm_mat, true);
 
@@ -289,11 +317,11 @@ void ArmatureExporter::add_bone_transform(Object *ob_arm, Bone *bone, COLLADASW:
       mul_m4_m4m4(mat, parent_inverse, bone_rest_mat);
     }
 
-    // OPEN_SIM_COMPATIBILITY
+    /* OPEN_SIM_COMPATIBILITY */
 
     if (export_settings.get_open_sim()) {
-      // Remove rotations vs armature from transform
-      // parent_rest_rot * mat * irest_rot
+      /* Remove rotations vs armature from transform
+       * parent_rest_rot * mat * irest_rot */
       Matrix workmat;
       copy_m4_m4(workmat, bone_rest_mat);
 
@@ -315,7 +343,7 @@ void ArmatureExporter::add_bone_transform(Object *ob_arm, Bone *bone, COLLADASW:
     BCMatrix::sanitize(mat, LIMITTED_PRECISION);
   }
 
-  TransformWriter::add_joint_transform(node, mat, NULL, this->export_settings, has_restmat);
+  TransformWriter::add_joint_transform(node, mat, nullptr, this->export_settings, has_restmat);
 }
 
 std::string ArmatureExporter::get_controller_id(Object *ob_arm, Object *ob)

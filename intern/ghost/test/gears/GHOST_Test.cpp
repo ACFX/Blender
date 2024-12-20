@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /**
  * Copyright (C) 2001 NaN Technologies B.V.
@@ -43,18 +28,18 @@
 #  include <GL/gl.h>
 #endif  // defined(WIN32) || defined(__APPLE__)
 
-#include "GHOST_Rect.h"
+#include "GHOST_Rect.hh"
 
-#include "GHOST_IEvent.h"
-#include "GHOST_IEventConsumer.h"
-#include "GHOST_ISystem.h"
+#include "GHOST_IEvent.hh"
+#include "GHOST_IEventConsumer.hh"
+#include "GHOST_ISystem.hh"
 
 #define LEFT_EYE 0
 #define RIGHT_EYE 1
 
 static bool nVidiaWindows;  // very dirty but hey, it's for testing only
 
-static void gearsTimerProc(GHOST_ITimerTask *task, GHOST_TUns64 time);
+static void gearsTimerProc(GHOST_ITimerTask *task, uint64_t time);
 
 static class Application *fApp;
 static GLfloat view_rotx = 20.0, view_roty = 30.0, view_rotz = 0.0;
@@ -71,9 +56,9 @@ void StereoProjection(float left,
                       float dist,
                       float eye);
 
-static void testTimerProc(GHOST_ITimerTask * /*task*/, GHOST_TUns64 time)
+static void testTimerProc(GHOST_ITimerTask * /*task*/, uint64_t time)
 {
-  std::cout << "timer1, time=" << (int)time << "\n";
+  std::cout << "timer1, time=" << int(time) << "\n";
 }
 
 static void gearGL(
@@ -345,7 +330,7 @@ void StereoProjection(float left,
                       float zero_plane,
                       float dist,
                       float eye)
-/* Perform the perspective projection for one eye's subfield.
+/* Perform the perspective projection for one eye's sub-field.
  * The projection is in the direction of the negative z axis.
  *
  * -6.0, 6.0, -4.8, 4.8,
@@ -365,8 +350,8 @@ void StereoProjection(float left,
  * of zero parallax.
  *
  * -0.31
- * eye = half the eye separation; positive for the right eye subfield,
- * negative for the left eye subfield.
+ * eye = half the eye separation; positive for the right eye sub-field,
+ * negative for the left eye sub-field.
  */
 {
   float xmid, ymid, clip_near, clip_far, topw, bottomw, leftw, rightw, dx, dy, n_over_d;
@@ -392,13 +377,12 @@ void StereoProjection(float left,
   glFrustum(leftw, rightw, bottomw, topw, clip_near, clip_far);
 
   glTranslatef(-xmid - eye, -ymid, -zero_plane - dist);
-  return;
-} /* stereoproj */
+}
 
 class Application : public GHOST_IEventConsumer {
  public:
   Application(GHOST_ISystem *system);
-  ~Application(void);
+  ~Application();
   virtual bool processEvent(GHOST_IEvent *event);
 
   GHOST_ISystem *m_system;
@@ -423,18 +407,13 @@ Application::Application(GHOST_ISystem *system)
       m_exitRequested(false),
       stereo(false)
 {
-  GHOST_GLSettings glSettings = {0};
+  GHOST_GPUSettings gpuSettings = {0};
+  gpuSettings.context_type = GHOST_kDrawingContextTypeOpenGL;
   fApp = this;
 
   // Create the main window
-  m_mainWindow = system->createWindow("gears - main window",
-                                      10,
-                                      64,
-                                      320,
-                                      200,
-                                      GHOST_kWindowStateNormal,
-                                      GHOST_kDrawingContextTypeOpenGL,
-                                      glSettings);
+  m_mainWindow = system->createWindow(
+      "gears - main window", 10, 64, 320, 200, GHOST_kWindowStateNormal, gpuSettings);
 
   if (!m_mainWindow) {
     std::cout << "could not create main window\n";
@@ -442,14 +421,8 @@ Application::Application(GHOST_ISystem *system)
   }
 
   // Create a secondary window
-  m_secondaryWindow = system->createWindow("gears - secondary window",
-                                           340,
-                                           64,
-                                           320,
-                                           200,
-                                           GHOST_kWindowStateNormal,
-                                           GHOST_kDrawingContextTypeOpenGL,
-                                           glSettings);
+  m_secondaryWindow = system->createWindow(
+      "gears - secondary window", 340, 64, 320, 200, GHOST_kWindowStateNormal, gpuSettings);
   if (!m_secondaryWindow) {
     std::cout << "could not create secondary window\n";
     exit(-1);
@@ -459,7 +432,7 @@ Application::Application(GHOST_ISystem *system)
   m_gearsTimer = system->installTimer(0 /*delay*/, 20 /*interval*/, gearsTimerProc, m_mainWindow);
 }
 
-Application::~Application(void)
+Application::~Application()
 {
   // Dispose windows
   if (m_system->validWindow(m_mainWindow)) {
@@ -470,7 +443,7 @@ Application::~Application(void)
   }
 }
 
-bool Application::processEvent(GHOST_IEvent *event)
+bool Application::processEvent(const GHOST_IEvent *event)
 {
   GHOST_IWindow *window = event->getWindow();
   bool handled = true;
@@ -494,8 +467,8 @@ bool Application::processEvent(GHOST_IEvent *event)
       else {
         view_rotz -= 5.f;
       }
-    } break;
-
+      break;
+    }
     case GHOST_kEventKeyUp:
       break;
 
@@ -510,7 +483,8 @@ bool Application::processEvent(GHOST_IEvent *event)
           }
           m_cursor = (GHOST_TStandardCursor)cursor;
           window->setCursorShape(m_cursor);
-        } break;
+          break;
+        }
 
         case GHOST_kKeyE: {
           int x = 200, y = 200;
@@ -565,7 +539,8 @@ bool Application::processEvent(GHOST_IEvent *event)
           if (down) {
             std::cout << "right control down\n";
           }
-        } break;
+          break;
+        }
 
         case GHOST_kKeyQ:
           if (m_system->getFullScreen()) {
@@ -576,10 +551,12 @@ bool Application::processEvent(GHOST_IEvent *event)
           break;
 
         case GHOST_kKeyS:  // toggle mono and stereo
-          if (stereo)
+          if (stereo) {
             stereo = false;
-          else
+          }
+          else {
             stereo = true;
+          }
           break;
 
         case GHOST_kKeyT:
@@ -605,7 +582,8 @@ bool Application::processEvent(GHOST_IEvent *event)
         default:
           break;
       }
-    } break;
+      break;
+    }
 
     case GHOST_kEventWindowClose: {
       GHOST_IWindow *window2 = event->getWindow();
@@ -615,7 +593,8 @@ bool Application::processEvent(GHOST_IEvent *event)
       else {
         m_system->disposeWindow(window2);
       }
-    } break;
+      break;
+    }
 
     case GHOST_kEventWindowActivate:
       handled = false;
@@ -627,8 +606,9 @@ bool Application::processEvent(GHOST_IEvent *event)
 
     case GHOST_kEventWindowUpdate: {
       GHOST_IWindow *window2 = event->getWindow();
-      if (!m_system->validWindow(window2))
+      if (!m_system->validWindow(window2)) {
         break;
+      }
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -653,7 +633,8 @@ bool Application::processEvent(GHOST_IEvent *event)
         glPopMatrix();
       }
       window2->swapBuffers();
-    } break;
+      break;
+    }
 
     default:
       handled = false;
@@ -697,8 +678,9 @@ int main(int /*argc*/, char ** /*argv*/)
     if (lresult == ERROR_SUCCESS)
       printf("Successfully set value for key\n");
     regkey.Close();
-    if (lresult == ERROR_SUCCESS)
+    if (lresult == ERROR_SUCCESS) {
       printf("Successfully closed key\n");
+    }
     //      regkey.Write("2");
   }
 #endif  // WIN32
@@ -731,7 +713,7 @@ int main(int /*argc*/, char ** /*argv*/)
   return 0;
 }
 
-static void gearsTimerProc(GHOST_ITimerTask *task, GHOST_TUns64 /*time*/)
+static void gearsTimerProc(GHOST_ITimerTask *task, uint64_t /*time*/)
 {
   fAngle += 2.0;
   view_roty += 1.0;

@@ -1,28 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
-#ifndef __DNA_COLOR_TYPES_H__
-#define __DNA_COLOR_TYPES_H__
+#pragma once
 
 #include "DNA_defs.h"
 #include "DNA_vec_types.h"
@@ -34,17 +18,22 @@
 
 #define CM_TOT 4
 
+#define GPU_SKY_WIDTH 512
+#define GPU_SKY_HEIGHT 128
+
 typedef struct CurveMapPoint {
   float x, y;
   /** Shorty for result lookup. */
   short flag, shorty;
 } CurveMapPoint;
 
-/* curvepoint->flag */
+/** #CurveMapPoint.flag */
 enum {
   CUMA_SELECT = (1 << 0),
   CUMA_HANDLE_VECTOR = (1 << 1),
   CUMA_HANDLE_AUTO_ANIM = (1 << 2),
+  /** Temporary tag for point deletion. */
+  CUMA_REMOVE = (1 << 3),
 };
 
 typedef struct CurveMap {
@@ -62,11 +51,13 @@ typedef struct CurveMap {
   /** Display and evaluate table. */
   CurveMapPoint *table;
 
-  /** For RGB curves, premulled table. */
+  /** For RGB curves, pre-multiplied table. */
   CurveMapPoint *premultable;
-  /** For RGB curves, premulled extrapolation vector. */
+  /** For RGB curves, pre-multiplied extrapolation vector. */
   float premul_ext_in[2];
   float premul_ext_out[2];
+  short default_handle_type;
+  char _pad[6];
 } CurveMap;
 
 typedef struct CurveMapping {
@@ -92,38 +83,39 @@ typedef struct CurveMapping {
   char _pad[6];
 } CurveMapping;
 
-/* CurveMapping.flag */
+/** #CurveMapping.flag */
 typedef enum eCurveMappingFlags {
   CUMA_DO_CLIP = (1 << 0),
   CUMA_PREMULLED = (1 << 1),
   CUMA_DRAW_CFRA = (1 << 2),
   CUMA_DRAW_SAMPLE = (1 << 3),
 
-  /* The curve is extended by extrapolation. When not set the curve is extended
-   * Horizontally */
+  /** The curve is extended by extrapolation. When not set the curve is extended horizontally. */
   CUMA_EXTEND_EXTRAPOLATE = (1 << 4),
+  CUMA_USE_WRAPPING = (1 << 5),
 } eCurveMappingFlags;
 
-/* cumapping->preset */
+/** #CurveMapping.preset */
 typedef enum eCurveMappingPreset {
   CURVE_PRESET_LINE = 0,
   CURVE_PRESET_SHARP = 1,
   CURVE_PRESET_SMOOTH = 2,
   CURVE_PRESET_MAX = 3,
-  CURVE_PRESET_MID9 = 4,
+  CURVE_PRESET_MID8 = 4,
   CURVE_PRESET_ROUND = 5,
   CURVE_PRESET_ROOT = 6,
   CURVE_PRESET_GAUSS = 7,
   CURVE_PRESET_BELL = 8,
+  CURVE_PRESET_CONSTANT_MEDIAN = 9,
 } eCurveMappingPreset;
 
-/* CurveMapping->tone */
+/** #CurveMapping.tone */
 typedef enum eCurveMappingTone {
   CURVE_TONE_STANDARD = 0,
   CURVE_TONE_FILMLIKE = 2,
 } eCurveMappingTone;
 
-/* histogram->mode */
+/** #Histogram.mode */
 enum {
   HISTO_MODE_LUMA = 0,
   HISTO_MODE_RGB = 1,
@@ -151,8 +143,7 @@ typedef struct Histogram {
   short flag;
   int height;
 
-  /* sample line only */
-  /* image coords src -> dst */
+  /** Sample line only (image coords: source -> destination). */
   float co[2][2];
 } Histogram;
 
@@ -160,30 +151,39 @@ typedef struct Scopes {
   int ok;
   int sample_full;
   int sample_lines;
-  float accuracy;
   int wavefrm_mode;
+  int vecscope_mode;
+  int wavefrm_height;
+  int vecscope_height;
+  int waveform_tot;
+  float accuracy;
   float wavefrm_alpha;
   float wavefrm_yfac;
-  int wavefrm_height;
   float vecscope_alpha;
-  int vecscope_height;
   float minmax[3][2];
   struct Histogram hist;
   float *waveform_1;
   float *waveform_2;
   float *waveform_3;
   float *vecscope;
-  int waveform_tot;
-  char _pad[4];
+  float *vecscope_rgb;
 } Scopes;
 
-/* scopes->wavefrm_mode */
-#define SCOPES_WAVEFRM_LUMA 0
-#define SCOPES_WAVEFRM_RGB_PARADE 1
-#define SCOPES_WAVEFRM_YCC_601 2
-#define SCOPES_WAVEFRM_YCC_709 3
-#define SCOPES_WAVEFRM_YCC_JPEG 4
-#define SCOPES_WAVEFRM_RGB 5
+/** #Scopes.wavefrm_mode */
+enum {
+  SCOPES_WAVEFRM_LUMA = 0,
+  SCOPES_WAVEFRM_RGB_PARADE = 1,
+  SCOPES_WAVEFRM_YCC_601 = 2,
+  SCOPES_WAVEFRM_YCC_709 = 3,
+  SCOPES_WAVEFRM_YCC_JPEG = 4,
+  SCOPES_WAVEFRM_RGB = 5,
+};
+
+/** #Scopes.vecscope_mode */
+enum {
+  SCOPES_VECSCOPE_RGB = 0,
+  SCOPES_VECSCOPE_LUMA = 1,
+};
 
 typedef struct ColorManagedViewSettings {
   int flag;
@@ -193,10 +193,13 @@ typedef struct ColorManagedViewSettings {
   char look[64];
   /** View transform which is being applied when displaying buffer on the screen. */
   char view_transform[64];
-  /** Fstop exposure. */
+  /** F-stop exposure. */
   float exposure;
   /** Post-display gamma transform. */
   float gamma;
+  /** White balance parameters. */
+  float temperature;
+  float tint;
   /** Pre-display RGB curves transform. */
   struct CurveMapping *curve_mapping;
   void *_pad2;
@@ -211,9 +214,9 @@ typedef struct ColorManagedColorspaceSettings {
   char name[64];
 } ColorManagedColorspaceSettings;
 
-/* ColorManagedViewSettings->flag */
+/** #ColorManagedViewSettings.flag */
 enum {
   COLORMANAGE_VIEW_USE_CURVES = (1 << 0),
+  COLORMANAGE_VIEW_USE_HDR = (1 << 1),
+  COLORMANAGE_VIEW_USE_WHITE_BALANCE = (1 << 2),
 };
-
-#endif

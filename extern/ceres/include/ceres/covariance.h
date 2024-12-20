@@ -35,8 +35,9 @@
 #include <utility>
 #include <vector>
 
+#include "ceres/internal/config.h"
 #include "ceres/internal/disable_warnings.h"
-#include "ceres/internal/port.h"
+#include "ceres/internal/export.h"
 #include "ceres/types.h"
 
 namespace ceres {
@@ -51,7 +52,7 @@ class CovarianceImpl;
 // =======
 // It is very easy to use this class incorrectly without understanding
 // the underlying mathematics. Please read and understand the
-// documentation completely before attempting to use this class.
+// documentation completely before attempting to use it.
 //
 //
 // This class allows the user to evaluate the covariance for a
@@ -73,7 +74,7 @@ class CovarianceImpl;
 // the maximum likelihood estimate of x given observations y is the
 // solution to the non-linear least squares problem:
 //
-//  x* = arg min_x |f(x)|^2
+//  x* = arg min_x |f(x) - y|^2
 //
 // And the covariance of x* is given by
 //
@@ -145,7 +146,7 @@ class CovarianceImpl;
 //   a. The rank deficiency arises from overparameterization. e.g., a
 //   four dimensional quaternion used to parameterize SO(3), which is
 //   a three dimensional manifold. In cases like this, the user should
-//   use an appropriate LocalParameterization. Not only will this lead
+//   use an appropriate LocalParameterization/Manifold. Not only will this lead
 //   to better numerical behaviour of the Solver, it will also expose
 //   the rank deficiency to the Covariance object so that it can
 //   handle it correctly.
@@ -220,11 +221,11 @@ class CERES_EXPORT Covariance {
     // 1. DENSE_SVD uses Eigen's JacobiSVD to perform the
     //    computations. It computes the singular value decomposition
     //
-    //      U * S * V' = J
+    //      U * D * V' = J
     //
     //    and then uses it to compute the pseudo inverse of J'J as
     //
-    //      pseudoinverse[J'J]^ = V * pseudoinverse[S] * V'
+    //      pseudoinverse[J'J] = V * pseudoinverse[D^2] * V'
     //
     //    It is an accurate but slow method and should only be used
     //    for small to moderate sized problems. It can handle
@@ -235,7 +236,7 @@ class CERES_EXPORT Covariance {
     //
     //      Q * R = J
     //
-    //    [J'J]^-1 = [R*R']^-1
+    //    [J'J]^-1 = [R'*R]^-1
     //
     // SPARSE_QR is not capable of computing the covariance if the
     // Jacobian is rank deficient. Depending on the value of

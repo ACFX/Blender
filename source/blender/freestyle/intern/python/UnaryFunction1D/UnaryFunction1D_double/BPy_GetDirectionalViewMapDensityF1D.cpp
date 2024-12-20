@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -24,15 +12,21 @@
 #include "../../BPy_Convert.h"
 #include "../../BPy_IntegrationType.h"
 
+#include "BLI_sys_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-static char GetDirectionalViewMapDensityF1D___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    GetDirectionalViewMapDensityF1D___doc__,
     "Class hierarchy: :class:`freestyle.types.UnaryFunction1D` > "
     ":class:`freestyle.types.UnaryFunction1DDouble` "
     "> :class:`GetDirectionalViewMapDensityF1D`\n"
@@ -60,8 +54,8 @@ static char GetDirectionalViewMapDensityF1D___doc__[] =
     ".. method:: __call__(inter)\n"
     "\n"
     "   Returns the density evaluated for an Interface1D in of the steerable\n"
-    "   viewmaps image.  The direction telling which Directional map to choose\n"
-    "   is explicitly specified by the user.  The density is evaluated for a\n"
+    "   viewmaps image. The direction telling which Directional map to choose\n"
+    "   is explicitly specified by the user. The density is evaluated for a\n"
     "   set of points along the Interface1D (using the\n"
     "   :class:`freestyle.functions.ReadSteerableViewMapPixelF0D` functor) and\n"
     "   then integrated into a single value using a user-defined integration\n"
@@ -71,19 +65,20 @@ static char GetDirectionalViewMapDensityF1D___doc__[] =
     "   :type inter: :class:`freestyle.types.Interface1D`\n"
     "   :return: the density evaluated for an Interface1D in of the\n"
     "      steerable viewmaps image.\n"
-    "   :rtype: float\n";
+    "   :rtype: float\n");
 
 static int GetDirectionalViewMapDensityF1D___init__(BPy_GetDirectionalViewMapDensityF1D *self,
                                                     PyObject *args,
                                                     PyObject *kwds)
 {
-  static const char *kwlist[] = {"orientation", "level", "integration_type", "sampling", NULL};
-  PyObject *obj = 0;
-  unsigned int u1, u2;
+  static const char *kwlist[] = {"orientation", "level", "integration_type", "sampling", nullptr};
+  PyObject *obj = nullptr;
+  uint u1, u2;
   float f = 2.0;
 
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwds, "II|O!f", (char **)kwlist, &u1, &u2, &IntegrationType_Type, &obj, &f)) {
+          args, kwds, "II|O!f", (char **)kwlist, &u1, &u2, &IntegrationType_Type, &obj, &f))
+  {
     return -1;
   }
   IntegrationType t = (obj) ? IntegrationType_from_BPy_IntegrationType(obj) : MEAN;
@@ -95,43 +90,44 @@ static int GetDirectionalViewMapDensityF1D___init__(BPy_GetDirectionalViewMapDen
 /*-----------------------BPy_GetDirectionalViewMapDensityF1D type definition --------------------*/
 
 PyTypeObject GetDirectionalViewMapDensityF1D_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0) "GetDirectionalViewMapDensityF1D", /* tp_name */
-    sizeof(BPy_GetDirectionalViewMapDensityF1D),                      /* tp_basicsize */
-    0,                                                                /* tp_itemsize */
-    0,                                                                /* tp_dealloc */
-    0,                                                                /* tp_print */
-    0,                                                                /* tp_getattr */
-    0,                                                                /* tp_setattr */
-    0,                                                                /* tp_reserved */
-    0,                                                                /* tp_repr */
-    0,                                                                /* tp_as_number */
-    0,                                                                /* tp_as_sequence */
-    0,                                                                /* tp_as_mapping */
-    0,                                                                /* tp_hash  */
-    0,                                                                /* tp_call */
-    0,                                                                /* tp_str */
-    0,                                                                /* tp_getattro */
-    0,                                                                /* tp_setattro */
-    0,                                                                /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                         /* tp_flags */
-    GetDirectionalViewMapDensityF1D___doc__,                          /* tp_doc */
-    0,                                                                /* tp_traverse */
-    0,                                                                /* tp_clear */
-    0,                                                                /* tp_richcompare */
-    0,                                                                /* tp_weaklistoffset */
-    0,                                                                /* tp_iter */
-    0,                                                                /* tp_iternext */
-    0,                                                                /* tp_methods */
-    0,                                                                /* tp_members */
-    0,                                                                /* tp_getset */
-    &UnaryFunction1DDouble_Type,                                      /* tp_base */
-    0,                                                                /* tp_dict */
-    0,                                                                /* tp_descr_get */
-    0,                                                                /* tp_descr_set */
-    0,                                                                /* tp_dictoffset */
-    (initproc)GetDirectionalViewMapDensityF1D___init__,               /* tp_init */
-    0,                                                                /* tp_alloc */
-    0,                                                                /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "GetDirectionalViewMapDensityF1D",
+    /*tp_basicsize*/ sizeof(BPy_GetDirectionalViewMapDensityF1D),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ GetDirectionalViewMapDensityF1D___doc__,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ nullptr,
+    /*tp_base*/ &UnaryFunction1DDouble_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)GetDirectionalViewMapDensityF1D___init__,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////

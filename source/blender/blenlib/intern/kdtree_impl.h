@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -21,13 +9,16 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_kdtree_impl.h"
-#include "BLI_math.h"
-#include "BLI_strict_flags.h"
+#include "BLI_math_base.h"
 #include "BLI_utildefines.h"
 
-#define _CONCAT_AUX(MACRO_ARG1, MACRO_ARG2) MACRO_ARG1##MACRO_ARG2
-#define _CONCAT(MACRO_ARG1, MACRO_ARG2) _CONCAT_AUX(MACRO_ARG1, MACRO_ARG2)
-#define BLI_kdtree_nd_(id) _CONCAT(KDTREE_PREFIX_ID, _##id)
+#include <string.h>
+
+#include "BLI_strict_flags.h" /* Keep last. */
+
+#define _BLI_KDTREE_CONCAT_AUX(MACRO_ARG1, MACRO_ARG2) MACRO_ARG1##MACRO_ARG2
+#define _BLI_KDTREE_CONCAT(MACRO_ARG1, MACRO_ARG2) _BLI_KDTREE_CONCAT_AUX(MACRO_ARG1, MACRO_ARG2)
+#define BLI_kdtree_nd_(id) _BLI_KDTREE_CONCAT(KDTREE_PREFIX_ID, _##id)
 
 typedef struct KDTreeNode_head {
   uint left, right;
@@ -46,7 +37,8 @@ struct KDTree {
   KDTreeNode *nodes;
   uint nodes_len;
   uint root;
-#ifdef DEBUG
+  int max_node_index;
+#ifndef NDEBUG
   bool is_balanced;        /* ensure we call balance first */
   uint nodes_len_capacity; /* max size of the tree */
 #endif
@@ -60,7 +52,7 @@ struct KDTree {
 
 /**
  * When set we know all values are unbalanced,
- * otherwise clear them when re-balancing: see T62210.
+ * otherwise clear them when re-balancing: see #62210.
  */
 #define KD_NODE_ROOT_IS_INIT ((uint)-2)
 
@@ -104,8 +96,9 @@ KDTree *BLI_kdtree_nd_(new)(uint nodes_len_capacity)
   tree->nodes = MEM_mallocN(sizeof(KDTreeNode) * nodes_len_capacity, "KDTreeNode");
   tree->nodes_len = 0;
   tree->root = KD_NODE_ROOT_IS_INIT;
+  tree->max_node_index = -1;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = false;
   tree->nodes_len_capacity = nodes_len_capacity;
 #endif
@@ -128,19 +121,20 @@ void BLI_kdtree_nd_(insert)(KDTree *tree, int index, const float co[KD_DIMS])
 {
   KDTreeNode *node = &tree->nodes[tree->nodes_len++];
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->nodes_len <= tree->nodes_len_capacity);
 #endif
 
-  /* note, array isn't calloc'd,
+  /* NOTE: array isn't calloc'd,
    * need to initialize all struct members */
 
   node->left = node->right = KD_NODE_UNSET;
   copy_vn_vn(node->co, co);
   node->index = index;
   node->d = 0;
+  tree->max_node_index = MAX2(tree->max_node_index, index);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = false;
 #endif
 }
@@ -158,7 +152,7 @@ static uint kdtree_balance(KDTreeNode *nodes, uint nodes_len, uint axis, const u
     return 0 + ofs;
   }
 
-  /* quicksort style sorting around median */
+  /* Quick-sort style sorting around median. */
   left = 0;
   right = nodes_len - 1;
   median = nodes_len / 2;
@@ -190,7 +184,7 @@ static uint kdtree_balance(KDTreeNode *nodes, uint nodes_len, uint axis, const u
     }
   }
 
-  /* set node and sort subnodes */
+  /* Set node and sort sub-nodes. */
   node = &nodes[median];
   node->d = axis;
   axis = (axis + 1) % KD_DIMS;
@@ -212,7 +206,7 @@ void BLI_kdtree_nd_(balance)(KDTree *tree)
 
   tree->root = kdtree_balance(tree->nodes, tree->nodes_len, 0, 0);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = true;
 #endif
 }
@@ -243,7 +237,7 @@ int BLI_kdtree_nd_(find_nearest)(const KDTree *tree,
   float min_dist, cur_dist;
   uint stack_len_capacity, cur = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -353,7 +347,7 @@ int BLI_kdtree_nd_(find_nearest_cb)(
   float min_dist = FLT_MAX, cur_dist;
   uint stack_len_capacity, cur = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -494,7 +488,7 @@ int BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
   uint stack_len_capacity, cur = 0;
   uint i, nearest_len = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -594,7 +588,7 @@ int BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
 int BLI_kdtree_nd_(find_nearest_n)(const KDTree *tree,
                                    const float co[KD_DIMS],
                                    KDTreeNearest r_nearest[],
-                                   const uint nearest_len_capacity)
+                                   uint nearest_len_capacity)
 {
   return BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
       tree, co, r_nearest, nearest_len_capacity, NULL, NULL);
@@ -659,7 +653,7 @@ int BLI_kdtree_nd_(range_search_with_len_squared_cb)(
   uint stack_len_capacity, cur = 0;
   uint nearest_len = 0, nearest_len_capacity = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -726,7 +720,7 @@ int BLI_kdtree_nd_(range_search_with_len_squared_cb)(
 int BLI_kdtree_nd_(range_search)(const KDTree *tree,
                                  const float co[KD_DIMS],
                                  KDTreeNearest **r_nearest,
-                                 const float range)
+                                 float range)
 {
   return BLI_kdtree_nd_(range_search_with_len_squared_cb)(tree, co, r_nearest, range, NULL, NULL);
 }
@@ -753,7 +747,7 @@ void BLI_kdtree_nd_(range_search_cb)(
   float range_sq = range * range, dist_sq;
   uint stack_len_capacity, cur = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -810,12 +804,14 @@ finally:
  * Use when we want to loop over nodes ordered by index.
  * Requires indices to be aligned with nodes.
  */
-static uint *kdtree_order(const KDTree *tree)
+static int *kdtree_order(const KDTree *tree)
 {
   const KDTreeNode *nodes = tree->nodes;
-  uint *order = MEM_mallocN(sizeof(uint) * tree->nodes_len, __func__);
+  const size_t bytes_num = sizeof(int) * (size_t)(tree->max_node_index + 1);
+  int *order = MEM_mallocN(bytes_num, __func__);
+  memset(order, -1, bytes_num);
   for (uint i = 0; i < tree->nodes_len; i++) {
-    order[nodes[i].index] = i;
+    order[nodes[i].index] = (int)i;
   }
   return order;
 }
@@ -878,11 +874,11 @@ static void deduplicate_recursive(const struct DeDuplicateParams *p, uint i)
  * the iteration order.
  * \param duplicates: An array of int's the length of #KDTree.nodes_len
  * Values initialized to -1 are candidates to me merged.
- * Setting the index to it's own position in the array prevents it from being touched,
+ * Setting the index to its own position in the array prevents it from being touched,
  * although it can still be used as a target.
  * \returns The number of merges found (includes any merges already in the \a duplicates array).
  *
- * \note Merging is always a single step (target indices wont be marked for merging).
+ * \note Merging is always a single step (target indices won't be marked for merging).
  */
 int BLI_kdtree_nd_(calc_duplicates_fast)(const KDTree *tree,
                                          const float range,
@@ -899,10 +895,13 @@ int BLI_kdtree_nd_(calc_duplicates_fast)(const KDTree *tree,
   };
 
   if (use_index_order) {
-    uint *order = kdtree_order(tree);
-    for (uint i = 0; i < tree->nodes_len; i++) {
-      const uint node_index = order[i];
-      const int index = (int)i;
+    int *order = kdtree_order(tree);
+    for (int i = 0; i < tree->max_node_index + 1; i++) {
+      const int node_index = order[i];
+      if (node_index == -1) {
+        continue;
+      }
+      const int index = i;
       if (ELEM(duplicates[index], -1, index)) {
         p.search = index;
         copy_vn_vn(p.search_co, tree->nodes[node_index].co);
@@ -941,6 +940,14 @@ int BLI_kdtree_nd_(calc_duplicates_fast)(const KDTree *tree,
 /** \name BLI_kdtree_3d_deduplicate
  * \{ */
 
+static int kdtree_cmp_bool(const bool a, const bool b)
+{
+  if (a == b) {
+    return 0;
+  }
+  return b ? -1 : 1;
+}
+
 static int kdtree_node_cmp_deduplicate(const void *n0_p, const void *n1_p)
 {
   const KDTreeNode *n0 = n0_p;
@@ -953,27 +960,26 @@ static int kdtree_node_cmp_deduplicate(const void *n0_p, const void *n1_p)
       return 1;
     }
   }
-  /* Sort by pointer so the first added will be used.
-   * assignment below ignores const correctness,
-   * however the values aren't used for sorting and are to be discarded. */
-  if (n0 < n1) {
-    ((KDTreeNode *)n1)->d = KD_DIMS; /* tag invalid */
-    return -1;
+
+  if (n0->d != KD_DIMS && n1->d != KD_DIMS) {
+    /* Two nodes share identical `co`
+     * Both are still valid.
+     * Cast away `const` and tag one of them as invalid. */
+    ((KDTreeNode *)n1)->d = KD_DIMS;
   }
-  else {
-    ((KDTreeNode *)n0)->d = KD_DIMS; /* tag invalid */
-    return 1;
-  }
+
+  /* Keep sorting until each unique value has one and only one valid node. */
+  return kdtree_cmp_bool(n0->d == KD_DIMS, n1->d == KD_DIMS);
 }
 
 /**
- * Remove exact duplicates (run before before balancing).
+ * Remove exact duplicates (run before balancing).
  *
  * Keep the first element added when duplicates are found.
  */
 int BLI_kdtree_nd_(deduplicate)(KDTree *tree)
 {
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = false;
 #endif
   qsort(tree->nodes, (size_t)tree->nodes_len, sizeof(*tree->nodes), kdtree_node_cmp_deduplicate);

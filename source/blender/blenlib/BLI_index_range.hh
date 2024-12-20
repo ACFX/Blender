@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __BLI_INDEX_RANGE_HH__
-#define __BLI_INDEX_RANGE_HH__
+#pragma once
 
 /** \file
  * \ingroup bli
@@ -27,42 +14,34 @@
  * I'd argue that the second loop is more readable and less error prone than the first one. That is
  * not necessarily always the case, but often it is.
  *
- *  for (uint i = 0; i < 10; i++) {
- *    for (uint j = 0; j < 20; j++) {
- *       for (uint k = 0; k < 30; k++) {
+ *  for (int64_t i = 0; i < 10; i++) {
+ *    for (int64_t j = 0; j < 20; j++) {
+ *       for (int64_t k = 0; k < 30; k++) {
  *
- *  for (uint i : IndexRange(10)) {
- *    for (uint j : IndexRange(20)) {
- *      for (uint k : IndexRange(30)) {
+ *  for (int64_t i : IndexRange(10)) {
+ *    for (int64_t j : IndexRange(20)) {
+ *      for (int64_t k : IndexRange(30)) {
  *
  * Some containers like blender::Vector have an index_range() method. This will return the
  * IndexRange that contains all indices that can be used to access the container. This is
  * particularly useful when you want to iterate over the indices and the elements (much like
  * Python's enumerate(), just worse). Again, I think the second example here is better:
  *
- *  for (uint i = 0; i < my_vector_with_a_long_name.size(); i++) {
+ *  for (int64_t i = 0; i < my_vector_with_a_long_name.size(); i++) {
  *    do_something(i, my_vector_with_a_long_name[i]);
  *
- *  for (uint i : my_vector_with_a_long_name.index_range()) {
+ *  for (int64_t i : my_vector_with_a_long_name.index_range()) {
  *    do_something(i, my_vector_with_a_long_name[i]);
  *
  * Ideally this could be could be even closer to Python's enumerate(). We might get that in the
  * future with newer C++ versions.
- *
- * One other important feature is the as_span method. This method returns an Span<uint>
- * that contains the interval as individual numbers.
  */
 
 #include <algorithm>
-#include <cmath>
-#include <iostream>
+#include <iosfwd>
 
-#include "BLI_utildefines.h"
-
-/* Forward declare tbb::blocked_range for conversion operations. */
-namespace tbb {
-template<typename Value> class blocked_range;
-}
+#include "BLI_assert.h"
+#include "BLI_random_access_iterator_mixin.hh"
 
 namespace blender {
 
@@ -70,57 +49,77 @@ template<typename T> class Span;
 
 class IndexRange {
  private:
-  uint start_ = 0;
-  uint size_ = 0;
+  int64_t start_ = 0;
+  int64_t size_ = 0;
 
  public:
-  IndexRange() = default;
+  constexpr IndexRange() = default;
 
-  explicit IndexRange(uint size) : start_(0), size_(size)
+  constexpr explicit IndexRange(int64_t size) : start_(0), size_(size)
   {
+    BLI_assert(size >= 0);
   }
 
-  IndexRange(uint start, uint size) : start_(start), size_(size)
+  constexpr IndexRange(const int64_t start, const int64_t size) : start_(start), size_(size)
   {
+    BLI_assert(start >= 0);
+    BLI_assert(size >= 0);
   }
 
-  template<typename T>
-  IndexRange(const tbb::blocked_range<T> &range) : start_(range.begin()), size_(range.size())
+  constexpr static IndexRange from_begin_size(const int64_t begin, const int64_t size)
   {
+    return IndexRange(begin, size);
   }
 
-  class Iterator {
+  constexpr static IndexRange from_begin_end(const int64_t begin, const int64_t end)
+  {
+    return IndexRange(begin, end - begin);
+  }
+
+  constexpr static IndexRange from_begin_end_inclusive(const int64_t begin, const int64_t last)
+  {
+    return IndexRange(begin, last - begin + 1);
+  }
+
+  constexpr static IndexRange from_end_size(const int64_t end, const int64_t size)
+  {
+    return IndexRange(end - size, size);
+  }
+
+  constexpr static IndexRange from_single(const int64_t index)
+  {
+    return IndexRange(index, 1);
+  }
+
+  class Iterator : public iterator::RandomAccessIteratorMixin<Iterator> {
+   public:
+    using value_type = int64_t;
+    using pointer = const int64_t *;
+    using reference = int64_t;
+
    private:
-    uint current_;
+    int64_t current_;
 
    public:
-    Iterator(uint current) : current_(current)
+    constexpr explicit Iterator(int64_t current) : current_(current) {}
+
+    constexpr int64_t operator*() const
     {
+      return current_;
     }
 
-    Iterator &operator++()
-    {
-      current_++;
-      return *this;
-    }
-
-    bool operator!=(const Iterator &iterator) const
-    {
-      return current_ != iterator.current_;
-    }
-
-    uint operator*() const
+    const int64_t &iter_prop() const
     {
       return current_;
     }
   };
 
-  Iterator begin() const
+  constexpr Iterator begin() const
   {
     return Iterator(start_);
   }
 
-  Iterator end() const
+  constexpr Iterator end() const
   {
     return Iterator(start_ + size_);
   }
@@ -128,8 +127,9 @@ class IndexRange {
   /**
    * Access an element in the range.
    */
-  uint operator[](uint index) const
+  constexpr int64_t operator[](int64_t index) const
   {
+    BLI_assert(index >= 0);
     BLI_assert(index < this->size());
     return start_ + index;
   }
@@ -137,32 +137,59 @@ class IndexRange {
   /**
    * Two ranges compare equal when they contain the same numbers.
    */
-  friend bool operator==(IndexRange a, IndexRange b)
+  constexpr friend bool operator==(IndexRange a, IndexRange b)
   {
     return (a.size_ == b.size_) && (a.start_ == b.start_ || a.size_ == 0);
+  }
+  constexpr friend bool operator!=(IndexRange a, IndexRange b)
+  {
+    return !(a == b);
   }
 
   /**
    * Get the amount of numbers in the range.
    */
-  uint size() const
+  constexpr int64_t size() const
   {
     return size_;
+  }
+
+  constexpr IndexRange index_range() const
+  {
+    return IndexRange(size_);
+  }
+
+  /**
+   * Returns true if the size is zero.
+   */
+  constexpr bool is_empty() const
+  {
+    return size_ == 0;
+  }
+
+  /**
+   * Creates a new index range with the same beginning but a different end.
+   */
+  constexpr IndexRange with_new_end(const int64_t new_end) const
+  {
+    return IndexRange::from_begin_end(start_, new_end);
   }
 
   /**
    * Create a new range starting at the end of the current one.
    */
-  IndexRange after(uint n) const
+  constexpr IndexRange after(int64_t n) const
   {
+    BLI_assert(n >= 0);
     return IndexRange(start_ + size_, n);
   }
 
   /**
    * Create a new range that ends at the start of the current one.
    */
-  IndexRange before(uint n) const
+  constexpr IndexRange before(int64_t n) const
   {
+    BLI_assert(n >= 0);
     return IndexRange(start_ - n, n);
   }
 
@@ -170,26 +197,38 @@ class IndexRange {
    * Get the first element in the range.
    * Asserts when the range is empty.
    */
-  uint first() const
+  constexpr int64_t first() const
   {
     BLI_assert(this->size() > 0);
     return start_;
   }
 
   /**
-   * Get the last element in the range.
-   * Asserts when the range is empty.
+   * Get the nth last element in the range.
+   * Asserts when the range is empty or when n is negative.
    */
-  uint last() const
+  constexpr int64_t last(const int64_t n = 0) const
   {
+    BLI_assert(n >= 0);
+    BLI_assert(n < size_);
     BLI_assert(this->size() > 0);
-    return start_ + size_ - 1;
+    return start_ + size_ - 1 - n;
+  }
+
+  /**
+   * Get the element one before the beginning. The returned value is undefined when the range is
+   * empty, and the range must start after zero already.
+   */
+  constexpr int64_t one_before_start() const
+  {
+    BLI_assert(start_ > 0);
+    return start_ - 1;
   }
 
   /**
    * Get the element one after the end. The returned value is undefined when the range is empty.
    */
-  uint one_after_last() const
+  constexpr int64_t one_after_last() const
   {
     return start_ + size_;
   }
@@ -197,7 +236,7 @@ class IndexRange {
   /**
    * Get the first element in the range. The returned value is undefined when the range is empty.
    */
-  uint start() const
+  constexpr int64_t start() const
   {
     return start_;
   }
@@ -205,37 +244,126 @@ class IndexRange {
   /**
    * Returns true when the range contains a certain number, otherwise false.
    */
-  bool contains(uint value) const
+  constexpr bool contains(int64_t value) const
   {
     return value >= start_ && value < start_ + size_;
   }
 
   /**
+   * Returns true when all indices in the given range are also in the current range.
+   */
+  constexpr bool contains(const IndexRange range) const
+  {
+    if (range.is_empty()) {
+      return true;
+    }
+    if (range.start_ < start_) {
+      return false;
+    }
+    if (range.start_ + range.size_ > start_ + size_) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Returns a new range, that contains a sub-interval of the current one.
    */
-  IndexRange slice(uint start, uint size) const
+  constexpr IndexRange slice(int64_t start, int64_t size) const
   {
-    uint new_start = start_ + start;
+    BLI_assert(start >= 0);
+    BLI_assert(size >= 0);
+    int64_t new_start = start_ + start;
     BLI_assert(new_start + size <= start_ + size_ || size == 0);
     return IndexRange(new_start, size);
   }
-  IndexRange slice(IndexRange range) const
+  constexpr IndexRange slice(IndexRange range) const
   {
     return this->slice(range.start(), range.size());
   }
 
   /**
-   * Get read-only access to a memory buffer that contains the range as actual numbers.
+   * Returns a new IndexRange that contains the intersection of the current one with the given
+   * range. Returns empty range if there are no overlapping indices. The returned range is always
+   * a valid slice of this range.
    */
-  Span<uint> as_span() const;
-
-  friend std::ostream &operator<<(std::ostream &stream, IndexRange range)
+  constexpr IndexRange intersect(IndexRange other) const
   {
-    stream << "[" << range.start() << ", " << range.one_after_last() << ")";
-    return stream;
+    const int64_t old_end = start_ + size_;
+    const int64_t new_start = std::min(old_end, std::max(start_, other.start_));
+    const int64_t new_end = std::max(new_start, std::min(old_end, other.start_ + other.size_));
+    return IndexRange(new_start, new_end - new_start);
   }
+
+  /**
+   * Returns a new IndexRange with n elements removed from the beginning of the range.
+   * This invokes undefined behavior when n is negative.
+   */
+  constexpr IndexRange drop_front(int64_t n) const
+  {
+    BLI_assert(n >= 0);
+    const int64_t new_size = std::max<int64_t>(0, size_ - n);
+    return IndexRange(start_ + n, new_size);
+  }
+
+  /**
+   * Returns a new IndexRange with n elements removed from the end of the range.
+   * This invokes undefined behavior when n is negative.
+   */
+  constexpr IndexRange drop_back(int64_t n) const
+  {
+    BLI_assert(n >= 0);
+    const int64_t new_size = std::max<int64_t>(0, size_ - n);
+    return IndexRange(start_, new_size);
+  }
+
+  /**
+   * Returns a new IndexRange that only contains the first n elements. This invokes undefined
+   * behavior when n is negative.
+   */
+  constexpr IndexRange take_front(int64_t n) const
+  {
+    BLI_assert(n >= 0);
+    const int64_t new_size = std::min<int64_t>(size_, n);
+    return IndexRange(start_, new_size);
+  }
+
+  /**
+   * Returns a new IndexRange that only contains the last n elements. This invokes undefined
+   * behavior when n is negative.
+   */
+  constexpr IndexRange take_back(int64_t n) const
+  {
+    BLI_assert(n >= 0);
+    const int64_t new_size = std::min<int64_t>(size_, n);
+    return IndexRange(start_ + size_ - new_size, new_size);
+  }
+
+  /**
+   * Move the range forward or backward within the larger array. The amount may be negative,
+   * but its absolute value cannot be greater than the existing start of the range.
+   */
+  constexpr IndexRange shift(int64_t n) const
+  {
+    return IndexRange(start_ + n, size_);
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, IndexRange range);
 };
 
-}  // namespace blender
+struct AlignedIndexRanges {
+  IndexRange prefix;
+  IndexRange aligned;
+  IndexRange suffix;
+};
 
-#endif /* __BLI_INDEX_RANGE_HH__ */
+/**
+ * Split a range into three parts so that the boundaries of the middle part are aligned to some
+ * power of two.
+ *
+ * This can be used when an algorithm can be optimized on aligned indices/memory. The algorithm
+ * then needs a slow path for the beginning and end, and a fast path for the aligned elements.
+ */
+AlignedIndexRanges split_index_range_by_alignment(const IndexRange range, const int64_t alignment);
+
+}  // namespace blender

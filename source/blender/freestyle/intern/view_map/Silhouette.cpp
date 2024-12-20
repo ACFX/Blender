@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -83,7 +71,7 @@ const SShape *SVertex::shape() const
   return _Shape;
 }
 
-const int SVertex::qi() const
+int SVertex::qi() const
 {
   if (getNature() & Nature::T_VERTEX) {
     Exception::raiseException();
@@ -139,7 +127,7 @@ const SShape *SVertex::occluded_shape() const
   return (_FEdges[0])->occluded_shape();
 }
 
-const bool SVertex::occludee_empty() const
+bool SVertex::occludee_empty() const
 {
   if (getNature() & Nature::T_VERTEX) {
     Exception::raiseException();
@@ -158,14 +146,14 @@ real SVertex::z_discontinuity() const
 FEdge *SVertex::fedge()
 {
   if (getNature() & Nature::T_VERTEX) {
-    return NULL;
+    return nullptr;
   }
   return _FEdges[0];
 }
 
 FEdge *SVertex::getFEdge(Interface0D &inter)
 {
-  FEdge *result = NULL;
+  FEdge *result = nullptr;
   SVertex *iVertexB = dynamic_cast<SVertex *>(&inter);
   if (!iVertexB) {
     return result;
@@ -173,11 +161,12 @@ FEdge *SVertex::getFEdge(Interface0D &inter)
   vector<FEdge *>::const_iterator fe = _FEdges.begin(), feend = _FEdges.end();
   for (; fe != feend; ++fe) {
     if ((((*fe)->vertexA() == this) && ((*fe)->vertexB() == iVertexB)) ||
-        (((*fe)->vertexB() == this) && ((*fe)->vertexA() == iVertexB))) {
+        (((*fe)->vertexB() == this) && ((*fe)->vertexA() == iVertexB)))
+    {
       result = (*fe);
     }
   }
-  if ((result == 0) && (getNature() & Nature::T_VERTEX)) {
+  if ((result == nullptr) && (getNature() & Nature::T_VERTEX)) {
     SVertex *brother;
     ViewVertex *vvertex = viewvertex();
     TVertex *tvertex = dynamic_cast<TVertex *>(vvertex);
@@ -189,13 +178,14 @@ FEdge *SVertex::getFEdge(Interface0D &inter)
       const vector<FEdge *> &fedges = brother->fedges();
       for (fe = fedges.begin(), feend = fedges.end(); fe != feend; ++fe) {
         if ((((*fe)->vertexA() == brother) && ((*fe)->vertexB() == iVertexB)) ||
-            (((*fe)->vertexB() == brother) && ((*fe)->vertexA() == iVertexB))) {
+            (((*fe)->vertexB() == brother) && ((*fe)->vertexA() == iVertexB)))
+        {
           result = (*fe);
         }
       }
     }
   }
-  if ((result == 0) && (iVertexB->getNature() & Nature::T_VERTEX)) {
+  if ((result == nullptr) && (iVertexB->getNature() & Nature::T_VERTEX)) {
     SVertex *brother;
     ViewVertex *vvertex = iVertexB->viewvertex();
     TVertex *tvertex = dynamic_cast<TVertex *>(vvertex);
@@ -206,7 +196,8 @@ FEdge *SVertex::getFEdge(Interface0D &inter)
       }
       for (fe = _FEdges.begin(), feend = _FEdges.end(); fe != feend; ++fe) {
         if ((((*fe)->vertexA() == this) && ((*fe)->vertexB() == brother)) ||
-            (((*fe)->vertexB() == this) && ((*fe)->vertexA() == brother))) {
+            (((*fe)->vertexB() == this) && ((*fe)->vertexA() == brother)))
+        {
           result = (*fe);
         }
       }
@@ -239,8 +230,8 @@ float FEdge::viewedge_length() const
 const SShape *FEdge::occluded_shape() const
 {
   ViewShape *aShape = _ViewEdge->aShape();
-  if (aShape == 0) {
-    return 0;
+  if (aShape == nullptr) {
+    return nullptr;
   }
   return aShape->sshape();
 }
@@ -275,7 +266,7 @@ int FEdge::occluders_size() const
   return _ViewEdge->occluders_size();
 }
 
-const bool FEdge::occludee_empty() const
+bool FEdge::occludee_empty() const
 {
   return _ViewEdge->occludee_empty();
 }
@@ -311,7 +302,7 @@ real FEdge::z_discontinuity() const
   z_discontinuity_functor<SVertex> _functor;
   Evaluate<SVertex, z_discontinuity_functor<SVertex>>(&_functor, iCombination, result);
 #endif
-  Vec3r middle((_VertexB->point3d() - _VertexA->point3d()));
+  Vec3r middle(_VertexB->point3d() - _VertexA->point3d());
   middle /= 2;
   Vec3r disc_vec(middle - _occludeeIntersection);
   real res = disc_vec.norm() / bboxsize;

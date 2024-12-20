@@ -1,15 +1,12 @@
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform float lineWidth;
+#include "infos/gpu_shader_3D_polyline_info.hh"
 
-in vec4 finalColor;
-noperspective in float smoothline;
-#ifdef CLIP
-in float clip;
-#endif
+#include "gpu_shader_colorspace_lib.glsl"
 
-out vec4 fragColor;
-
-#define SMOOTH_WIDTH 1.0
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_3D_polyline_uniform_color)
 
 void main()
 {
@@ -18,7 +15,9 @@ void main()
     discard;
   }
 #endif
-  fragColor = finalColor;
-  fragColor.a *= clamp((lineWidth + SMOOTH_WIDTH) * 0.5 - abs(smoothline), 0.0, 1.0);
+  fragColor = final_color;
+  if (lineSmooth) {
+    fragColor.a *= clamp((lineWidth + SMOOTH_WIDTH) * 0.5 - abs(smoothline), 0.0, 1.0);
+  }
   fragColor = blender_srgb_to_framebuffer_space(fragColor);
 }

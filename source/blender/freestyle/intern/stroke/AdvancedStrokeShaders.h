@@ -1,21 +1,8 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __FREESTYLE_ADVANCED_STROKE_SHADERS_H__
-#define __FREESTYLE_ADVANCED_STROKE_SHADERS_H__
+#pragma once
 
 /** \file
  * \ingroup freestyle
@@ -26,14 +13,14 @@
 
 namespace Freestyle {
 
-/*! [ Thickness Shader ].
+/** [ Thickness Shader ].
  *  Assigns thicknesses to the stroke vertices so that the stroke looks like made with a
  * calligraphic tool. i.e. The stroke will be the thickest in a main direction, the thinnest in the
  * direction perpendicular to this one, and an interpolation in between.
  */
 class CalligraphicShader : public StrokeShader {
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iMinThickness:
    *    The minimum thickness in the direction perpendicular to the main direction.
    *  \param iMaxThickness:
@@ -48,12 +35,10 @@ class CalligraphicShader : public StrokeShader {
                      const Vec2f &iOrientation,
                      bool clamp);
 
-  /*! Destructor. */
-  virtual ~CalligraphicShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~CalligraphicShader() {}
 
-  /*! The shading method */
+  /** The shading method */
   virtual int shade(Stroke &ioStroke) const;
 
  protected:
@@ -63,14 +48,14 @@ class CalligraphicShader : public StrokeShader {
   bool _clamp;
 };
 
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Spatial Noise stroke shader.
  *  Moves the vertices to make the stroke more noisy.
  * \see \htmlonly <a href=noise/noise.html>noise/noise.html</a> \endhtmlonly
  */
 class SpatialNoiseShader : public StrokeShader {
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iAmount:
    *    The amplitude of the noise.
    *  \param ixScale:
@@ -84,12 +69,10 @@ class SpatialNoiseShader : public StrokeShader {
    */
   SpatialNoiseShader(float iAmount, float ixScale, int nbOctave, bool smooth, bool pureRandom);
 
-  /*! Destructor. */
-  virtual ~SpatialNoiseShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~SpatialNoiseShader() {}
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &ioStroke) const;
 
  protected:
@@ -100,7 +83,7 @@ class SpatialNoiseShader : public StrokeShader {
   bool _pureRandom;
 };
 
-/*! [ Geometry Shader ].
+/** [ Geometry Shader ].
  *  Smooths the stroke.
  *  (Moves the vertices to make the stroke smoother).
  *  Uses curvature flow to converge towards a curve of constant curvature. The diffusion method we
@@ -109,7 +92,7 @@ class SpatialNoiseShader : public StrokeShader {
  */
 class SmoothingShader : public StrokeShader {
  public:
-  /*! Builds the shader.
+  /** Builds the shader.
    *  \param iNbIteration:
    *    The number of iterations. (400)
    *  \param iFactorPoint:
@@ -120,7 +103,7 @@ class SmoothingShader : public StrokeShader {
    *    0.2
    *  \param iAnisoPoint:
    *    0
-   *  \param iAnisNormal:
+   *  \param iAnisoNormal:
    *    0
    *  \param iAnisoCurvature:
    *    0
@@ -136,12 +119,10 @@ class SmoothingShader : public StrokeShader {
                   real iAnisoCurvature,
                   real icarricatureFactor);
 
-  /*! Destructor. */
-  virtual ~SmoothingShader()
-  {
-  }
+  /** Destructor. */
+  virtual ~SmoothingShader() {}
 
-  /*! The shading method. */
+  /** The shading method. */
   virtual int shade(Stroke &ioStroke) const;
 
  protected:
@@ -199,9 +180,7 @@ class Omitter : public Smoother {
  public:
   Omitter(Stroke &ioStroke);
 
-  virtual ~Omitter()
-  {
-  }
+  virtual ~Omitter() {}
 
   void omit(real sizeWindow, real thrVari, real thrFlat, real lFlat);
 
@@ -214,13 +193,11 @@ class Omitter : public Smoother {
   real _lengthFlat;
 };
 
-/*! Omission shader */
+/** Omission shader */
 class OmissionShader : public StrokeShader {
  public:
   OmissionShader(real sizeWindow, real thrVari, real thrFlat, real lFlat);
-  virtual ~OmissionShader()
-  {
-  }
+  virtual ~OmissionShader() {}
 
   virtual int shade(Stroke &ioStroke) const;
 
@@ -232,5 +209,3 @@ class OmissionShader : public StrokeShader {
 };
 
 } /* namespace Freestyle */
-
-#endif  // __FREESTYLE_ADVANCED_STROKE_SHADERS_H__
